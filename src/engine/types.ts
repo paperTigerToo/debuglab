@@ -159,7 +159,11 @@ export type IncidentDefinition<S extends string = string, F extends string = str
   postmortem: Postmortem
   /** How this Incident could have been prevented. */
   prevention: readonly string[]
+  /** What to study after this Incident, by Concept and Resource identifier. The content integrity test resolves them. */
+  links: IncidentLinks
 }
+
+export type IncidentLinks = { concepts: readonly string[]; resources: readonly string[] }
 
 export type Location = { kind: 'local' } | { kind: 'container'; pod: string; shell: 'sh' | 'bash' }
 

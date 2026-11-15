@@ -1,0 +1,92 @@
+// Primary sources only. Every link was opened and answered 200 when it was added (2026-11-15);
+// .scratch/debuglab-v1/issues/18-*.md checks them all again before release.
+
+export const subjects = ['Incident response', 'Troubleshooting method', 'Kubernetes', 'Postmortems'] as const
+export type Subject = (typeof subjects)[number]
+
+export type Resource = {
+  id: string
+  title: string
+  publisher: string
+  url: string
+  subject: Subject
+  /** One line on why it is worth reading. */
+  why: string
+}
+
+export const resources: readonly Resource[] = [
+  {
+    id: 'sre-managing-incidents',
+    title: 'Managing Incidents',
+    publisher: 'Google, Site Reliability Engineering',
+    url: 'https://sre.google/sre-book/managing-incidents/',
+    subject: 'Incident response',
+    why: 'Follows one badly run incident and the same incident run well, and explains the roles that made the difference.',
+  },
+  {
+    id: 'sre-emergency-response',
+    title: 'Emergency Response',
+    publisher: 'Google, Site Reliability Engineering',
+    url: 'https://sre.google/sre-book/emergency-response/',
+    subject: 'Incident response',
+    why: 'Real outages at Google, what the responders did and what they learned, including when undoing a change was the right first move.',
+  },
+  {
+    id: 'sre-workbook-incident-response',
+    title: 'Incident Response',
+    publisher: 'Google, The Site Reliability Workbook',
+    url: 'https://sre.google/workbook/incident-response/',
+    subject: 'Incident response',
+    why: 'Case studies from several companies on putting incident response into practice, with the mistakes they made on the way.',
+  },
+  {
+    id: 'pagerduty-during',
+    title: 'During an Incident',
+    publisher: 'PagerDuty Incident Response',
+    url: 'https://response.pagerduty.com/during/during_an_incident/',
+    subject: 'Incident response',
+    why: 'A step-by-step guide for the first minutes of an incident, written to be followed under pressure.',
+  },
+  {
+    id: 'sre-troubleshooting',
+    title: 'Effective Troubleshooting',
+    publisher: 'Google, Site Reliability Engineering',
+    url: 'https://sre.google/sre-book/effective-troubleshooting/',
+    subject: 'Troubleshooting method',
+    why: 'The method this site teaches: form a hypothesis, test it, and avoid the traps that send investigations in circles.',
+  },
+  {
+    id: 'gregg-methodology',
+    title: 'Performance Analysis Methodology',
+    publisher: 'Brendan Gregg',
+    url: 'https://www.brendangregg.com/methodology.html',
+    subject: 'Troubleshooting method',
+    why: 'Names the anti-methods everyone falls into, such as changing things at random, and the methods that replace them.',
+  },
+  {
+    id: 'k8s-deployment',
+    title: 'Deployments',
+    publisher: 'Kubernetes documentation',
+    url: 'https://kubernetes.io/docs/concepts/workloads/controllers/deployment/',
+    subject: 'Kubernetes',
+    why: 'How rollouts, revisions and rollbacks actually work, which is what you are relying on when you undo a release.',
+  },
+  {
+    id: 'k8s-logging',
+    title: 'Logging Architecture',
+    publisher: 'Kubernetes documentation',
+    url: 'https://kubernetes.io/docs/concepts/cluster-administration/logging/',
+    subject: 'Kubernetes',
+    why: 'Explains where container logs live and why they disappear with the pod, the reason Evidence must be saved first.',
+  },
+  {
+    id: 'sre-postmortem-culture',
+    title: 'Postmortem Culture: Learning from Failure',
+    publisher: 'Google, Site Reliability Engineering',
+    url: 'https://sre.google/sre-book/postmortem-culture/',
+    subject: 'Postmortems',
+    why: 'What a blameless postmortem is for, when to write one and how to make sure its action items happen.',
+  },
+]
+
+export const resourceById = (id: string) => resources.find((r) => r.id === id)

@@ -168,6 +168,9 @@ test('completing Bad Deploy by its Expert Path reaches a clean Debrief, saved ac
   await expect(page.getByRole('region', { name: 'Evidence' })).toContainText('kept')
   await expect(page.getByRole('region', { name: 'Expert Path' }).getByLabel('missed')).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Sample postmortem' })).toContainText('Action items')
+  const study = page.getByRole('region', { name: 'Study next' })
+  await expect(study.getByRole('link', { name: 'Mitigate first, then investigate' })).toBeVisible()
+  await expect(study.getByRole('link', { name: /Logging Architecture/ })).toHaveAttribute('href', /kubernetes\.io/)
 
   await page.getByRole('link', { name: 'Back to all Incidents' }).click()
   const card = page.getByRole('link', { name: /Bad Deploy/ })

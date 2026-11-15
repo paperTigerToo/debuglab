@@ -19,4 +19,5 @@ export const finishFixture = {
   mitigations: [{ id: 'rollback', label: 'Roll back', verdict: 'best', explanation: '' }] as MitigationOption[],
   postmortem: { summary: '', impact: '', timeline: [], rootCause: '', resolution: '', actionItems: [] } as Postmortem,
   prevention: [],
+  links: { concepts: [], resources: [] },
 } as const

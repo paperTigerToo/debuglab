@@ -8,6 +8,8 @@ export type Term = {
   matches: readonly string[]
   /** One or two plain sentences. */
   explanation: string
+  /** The Concept that explains this term in full, linked from its tooltip. */
+  concept?: string
 }
 
 export const terms: readonly Term[] = [
@@ -19,33 +21,39 @@ export const terms: readonly Term[] = [
   },
   {
     id: 'incident',
-    matches: ['Incident', 'Incidents', 'incident'],
+    concept: 'incident-lifecycle',
+    matches: ['Incident', 'Incidents'],
     explanation: 'One scripted failure of the Target System that you work through from first Symptom to Root Cause.',
   },
   {
     id: 'symptom',
+    concept: 'investigating-by-hypothesis',
     matches: ['Symptom', 'Symptoms'],
     explanation:
       'Something you are shown at the start of an Incident or uncover during it: an alert, a graph, a log line or command output.',
   },
   {
     id: 'mitigation',
+    concept: 'mitigate-then-investigate',
     matches: ['Mitigation', 'Mitigations', 'mitigation', 'mitigate'],
     explanation:
       'An action that stops user harm without explaining the failure, such as a rollback or turning a feature flag off. Mitigate first, then find the Root Cause.',
   },
   {
     id: 'root-cause',
+    concept: 'investigating-by-hypothesis',
     matches: ['Root Cause', 'root cause'],
     explanation: "The specific defect or condition that produced the Incident's Symptoms. Identifying it is what completes the investigation.",
   },
   {
     id: 'finding',
+    concept: 'investigating-by-hypothesis',
     matches: ['Finding', 'Findings'],
     explanation: 'A key fact about an Incident that you establish by seeing it in command output, such as "the pods are twelve minutes old".',
   },
   {
     id: 'evidence',
+    concept: 'mitigate-then-investigate',
     matches: ['Evidence', 'evidence'],
     explanation:
       'Perishable output that shows why the Target System failed, such as the logs of pods a rollback will replace. Save it before a Mitigation destroys it.',
@@ -74,7 +82,15 @@ export const terms: readonly Term[] = [
 
   // --- Incident response --------------------------------------------------------------------
   {
+    // The everyday sense, as opposed to DebugLab's scripted Incident above.
+    id: 'incident-general',
+    concept: 'incident-lifecycle',
+    matches: ['incident', 'incidents'],
+    explanation: 'An unplanned event that harms the people using a service and needs a response now. Each Incident in DebugLab is a scripted one.',
+  },
+  {
     id: 'alert',
+    concept: 'incident-lifecycle',
     matches: ['alert'],
     explanation: 'An automatic notification sent when a measured signal crosses a threshold for long enough.',
   },
@@ -85,6 +101,7 @@ export const terms: readonly Term[] = [
   },
   {
     id: 'postmortem',
+    concept: 'incident-lifecycle',
     matches: ['postmortem'],
     explanation: 'A written review after an Incident: what happened, why, and what will change. Blameless: it studies the system, not people.',
   },
@@ -162,6 +179,7 @@ export const terms: readonly Term[] = [
   },
   {
     id: 'rollback',
+    concept: 'mitigate-then-investigate',
     matches: ['rollback', 'roll back', 'rolled back'],
     explanation: 'Returning to the last version that worked. Usually the fastest safe Mitigation after a bad deploy.',
   },

@@ -2,7 +2,7 @@
 import { goalReached, hintsUsed } from './hints'
 import { canonical, splitPipes, splitRedirect } from './normalise'
 import { dashboard, evidenceStatus, harmStopped } from './session'
-import type { IncidentDefinition, MitigationOption, Postmortem, SessionState, TimelineEntry } from './types'
+import type { IncidentDefinition, IncidentLinks, MitigationOption, Postmortem, SessionState, TimelineEntry } from './types'
 
 export type Debrief = {
   rootCause: {
@@ -28,6 +28,8 @@ export type Debrief = {
   hintsUsed: number
   postmortem: Postmortem
   prevention: readonly string[]
+  /** What to study next. */
+  links: IncidentLinks
 }
 
 /** The Debrief for a finished session. Throws if the session has no outcome. */
@@ -75,6 +77,7 @@ export function debrief(definition: IncidentDefinition, state: SessionState): De
     hintsUsed: hintsUsed(state),
     postmortem: definition.postmortem,
     prevention: definition.prevention,
+    links: definition.links,
   }
 }
 

@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
+import { concepts } from '../content/concepts'
+import { resources } from '../content/resources'
 import type { Debrief } from '../engine/engine'
+import { conceptPath } from '../site/paths'
+import { Cite } from '../site/Prose'
 import { Annotated } from '../site/Term'
 
 const verdictText = {
@@ -197,6 +202,37 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
             </li>
           ))}
         </ul>
+      </Section>
+
+      <Section title="Study next">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-muted">Concepts this Incident exercised</p>
+            <ul className="mt-1 space-y-1">
+              {concepts
+                .filter((c) => d.links.concepts.includes(c.id))
+                .map((c) => (
+                  <li key={c.id}>
+                    <Link to={conceptPath(c.id)} className="text-accent hover:underline">
+                      {c.title}
+                    </Link>
+                  </li>
+                ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-muted">Resources</p>
+            <ul className="mt-1 space-y-1">
+              {resources
+                .filter((r) => d.links.resources.includes(r.id))
+                .map((r) => (
+                  <li key={r.id}>
+                    <Cite id={r.id}>{r.title}</Cite> <span className="text-xs text-muted">{r.publisher}</span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </div>
       </Section>
     </div>
   )

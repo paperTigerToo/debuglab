@@ -8,3 +8,7 @@
 
 - [ ] Five Concepts with interactive examples
 - [ ] Links resolve under the integrity check
+
+## Comments
+
+- From ticket 09: the content integrity test requires every Concept to be practised by at least one Incident (via the Incident's links), so each new Concept needs an Incident that names it. Concept summaries must stay plain text; links go in the body. The Debrief's "Study next" lists the Incident's linked Concepts, so link the prevention Concept from Bad Deploy to satisfy spec story 76.

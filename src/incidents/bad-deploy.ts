@@ -999,4 +999,8 @@ shm              64M     0   64M   0% /dev/shm`),
     'Make the rollout check what customers do. A health check that ignores payments passed while every checkout failed; a canary running a synthetic checkout would have caught it.',
     'Send application logs to a central store. Here the evidence lived only inside the pods, which is why it had to be saved before the rollback.',
   ],
+  links: {
+    concepts: ['incident-lifecycle', 'mitigate-then-investigate', 'investigating-by-hypothesis'],
+    resources: ['k8s-logging', 'k8s-deployment', 'sre-troubleshooting', 'sre-postmortem-culture'],
+  },
 })

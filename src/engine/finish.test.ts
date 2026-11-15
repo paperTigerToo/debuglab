@@ -77,6 +77,7 @@ const incident = defineIncident({
     actionItems: ['Validate config at startup'],
   },
   prevention: ['Validate configuration at startup.'],
+  links: { concepts: ['mitigate-then-investigate'], resources: ['k8s-logging'] },
 })
 
 function play(...inputs: (string | Input)[]): SessionState {
@@ -195,11 +196,12 @@ describe('the Debrief', () => {
     expect(d.expertPath.map((s) => s.covered)).toEqual([true, true, false, false, false])
   })
 
-  test('carries the Hints used, the sample postmortem and the prevention notes', () => {
+  test('carries the Hints used, the sample postmortem, the prevention notes and what to study next', () => {
     const d = debrief(incident, play(hint, hint, finish('renamed-key', 'rollback')))
     expect(d.hintsUsed).toBe(2)
     expect(d.postmortem.summary).toBe('Checkout failed for 13 minutes.')
     expect(d.prevention).toEqual(['Validate configuration at startup.'])
+    expect(d.links).toEqual({ concepts: ['mitigate-then-investigate'], resources: ['k8s-logging'] })
   })
 })
 
