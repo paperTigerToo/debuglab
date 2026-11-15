@@ -1,23 +1,48 @@
 import { describe, expect, test } from 'vitest'
-import { start, step } from '../engine/engine'
+import { evidenceStatus, start, step } from '../engine/engine'
+import type { IncidentDefinition, SessionState } from '../engine/types'
 import { incidents } from './index'
 
+/** Type a command, confirming it if the engine asks. */
+function type(incident: IncidentDefinition, state: SessionState, command: string): SessionState {
+  let next = step(incident, state, { kind: 'command', text: command }).state
+  if (next.pending) next = step(incident, next, { kind: 'command', text: 'y' }).state
+  return next
+}
+
+const isMutating = (incident: IncidentDefinition, command: string) =>
+  step(incident, start(incident), { kind: 'command', text: command }).state.pending !== undefined
+
 describe.each(incidents.map((i) => [i.title, i] as const))('%s', (_title, incident) => {
-  test('its Expert Path runs every command and reaches every key finding', () => {
+  test('its Expert Path runs every command, reaches every key finding and keeps the evidence', () => {
     let state = start(incident)
     for (const expert of incident.expertPath) {
-      const result = step(incident, state, { kind: 'command', text: expert.command })
-      state = result.state
+      state = type(incident, state, expert.command)
       expect(state.timeline.at(-1), expert.command).toEqual({ text: expert.command, result: 'ran' })
       for (const finding of expert.reaches ?? []) expect(state.findings, expert.command).toContain(finding)
     }
     expect([...state.findings].sort()).toEqual(Object.keys(incident.findings).sort())
+    expect(evidenceStatus(incident, state).lost).toEqual([])
+    expect(incident.dashboard[state.namedState]?.alert.status).toBe('resolved')
   })
 
-  test('every scripted command has output for every named state', () => {
+  test('mitigating immediately stops the harm but loses evidence and the Root Cause with it', () => {
+    const mitigation = incident.expertPath.find((s) => isMutating(incident, s.command))
+    expect(mitigation, 'the Expert Path includes a Mitigation').toBeDefined()
+    let state = type(incident, start(incident), mitigation!.command)
+    for (const expert of incident.expertPath) {
+      if (expert !== mitigation) state = type(incident, state, expert.command)
+    }
+    expect(incident.dashboard[state.namedState]?.alert.status).toBe('resolved')
+    expect(evidenceStatus(incident, state).lost).not.toEqual([])
+    expect(state.findings.length).toBeLessThan(Object.keys(incident.findings).length)
+  })
+
+  test('every named state has a dashboard, and every command applies in at least one state', () => {
+    for (const named of incident.states) expect(incident.dashboard[named], named).toBeDefined()
     for (const command of incident.commands) {
-      if (typeof command.output === 'string') continue
-      for (const named of incident.states) expect(command.output[named], command.match[0]).toBeDefined()
+      const outputs = typeof command.output === 'string' ? [command.output] : Object.values(command.output)
+      expect(outputs.length, command.match[0]).toBeGreaterThan(0)
     }
   })
 })

@@ -14,6 +14,7 @@ const lineStyle: Record<Line['kind'], string> = {
   output: 'text-[#c3cdd8]',
   error: 'text-[#ff5d6c]',
   notice: 'text-[#5cc8ff]',
+  warning: 'text-[#f5b84a]',
 }
 
 export function Terminal({ incident, state, onState }: Props) {

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { start } from '../engine/engine'
-import type { IncidentDefinition } from '../engine/types'
+import { dashboard, evidenceStatus, start } from '../engine/engine'
+import type { IncidentDefinition, SessionState } from '../engine/types'
 import { findIncident } from '../incidents'
+import { AlertPanel, Dashboard } from '../lab/Dashboard'
 import { Terminal } from '../lab/Terminal'
 import { NotFoundPage } from './NotFoundPage'
 
@@ -15,53 +16,120 @@ export function IncidentPage() {
 
 function IncidentWorkspace({ incident }: { incident: IncidentDefinition }) {
   const [state, setState] = useState(() => start(incident))
-  const findingIds = Object.keys(incident.findings)
+  // Changing the run remounts the terminal, clearing its scrollback and history.
+  const [run, setRun] = useState(0)
+  const data = dashboard(incident, state)
+
+  function restart() {
+    setState(start(incident))
+    setRun((r) => r + 1)
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link to="/lab" className="text-sm text-muted hover:text-text">
-          ← All Incidents
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{incident.title}</h1>
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <Link to="/lab" className="text-sm text-muted hover:text-text">
+            ← All Incidents
+          </Link>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{incident.title}</h1>
+        </div>
+        <RestartButton onRestart={restart} />
       </div>
 
-      <section
-        aria-label="Alert"
-        className="rounded-lg border border-danger/50 bg-danger/10 p-4"
-      >
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="rounded bg-danger px-2 py-0.5 font-mono text-xs font-semibold uppercase text-bg">
-            firing
-          </span>
-          <span className="font-mono text-sm font-semibold">{incident.alert.name}</span>
-          <span className="font-mono text-xs text-muted">since {incident.alert.startedAt}</span>
-        </div>
-        <p className="mt-2 text-sm">{incident.alert.summary}</p>
-        <p className="mt-1 font-mono text-xs text-muted">condition: {incident.alert.condition}</p>
-      </section>
-
+      <AlertPanel alert={incident.alert} data={data} />
       <p className="max-w-3xl text-sm text-muted">{incident.briefing}</p>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
-        <Terminal incident={incident} state={state} onState={setState} />
-        <aside aria-label="Findings" className="rounded-lg border border-line bg-panel p-4">
-          <h2 className="font-mono text-xs uppercase tracking-widest text-muted">
-            Findings {state.findings.length} of {findingIds.length}
-          </h2>
-          {state.findings.length === 0 ? (
-            <p className="mt-3 text-sm text-muted">Nothing established yet. Each key fact you uncover is noted here.</p>
-          ) : (
-            <ol className="mt-3 space-y-3 text-sm">
-              {state.findings.map((id) => (
-                <li key={id} className="border-l-2 border-accent pl-3">
-                  {incident.findings[id]?.summary}
-                </li>
-              ))}
-            </ol>
-          )}
-        </aside>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <Dashboard data={data} />
+        <div className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+          <Terminal key={run} incident={incident} state={state} onState={setState} />
+          <Progress incident={incident} state={state} />
+        </div>
       </div>
+    </div>
+  )
+}
+
+function RestartButton({ onRestart }: { onRestart: () => void }) {
+  const [asking, setAsking] = useState(false)
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAsking(true)}
+        className="ml-auto rounded border border-line px-3 py-1.5 text-sm text-muted hover:text-text"
+      >
+        Restart Incident
+      </button>
+    )
+  }
+  return (
+    <div role="group" aria-label="Confirm restart" className="ml-auto flex items-center gap-2 text-sm">
+      <span className="text-muted">Start over from the alert?</span>
+      <button
+        type="button"
+        onClick={() => {
+          setAsking(false)
+          onRestart()
+        }}
+        className="rounded bg-danger px-3 py-1.5 font-medium text-bg"
+      >
+        Restart
+      </button>
+      <button type="button" onClick={() => setAsking(false)} className="rounded border border-line px-3 py-1.5 text-muted">
+        Keep going
+      </button>
+    </div>
+  )
+}
+
+function Progress({ incident, state }: { incident: IncidentDefinition; state: SessionState }) {
+  const findingIds = Object.keys(incident.findings)
+  const { captured, lost } = evidenceStatus(incident, state)
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <aside aria-label="Findings" className="rounded-lg border border-line bg-panel p-4">
+        <h2 className="font-mono text-xs uppercase tracking-widest text-muted">
+          Findings {state.findings.length} of {findingIds.length}
+        </h2>
+        {state.findings.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">Nothing established yet. Each key fact you uncover is noted here.</p>
+        ) : (
+          <ol className="mt-3 space-y-3 text-sm">
+            {state.findings.map((id) => (
+              <li key={id} className="border-l-2 border-accent pl-3">
+                {incident.findings[id]?.summary}
+              </li>
+            ))}
+          </ol>
+        )}
+      </aside>
+      <aside aria-label="Evidence" className="rounded-lg border border-line bg-panel p-4">
+        <h2 className="font-mono text-xs uppercase tracking-widest text-muted">Evidence</h2>
+        {state.files.length === 0 && lost.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">
+            Nothing saved. Output redirected to a file (<code className="font-mono">&gt; name.log</code>) survives
+            whatever you change next.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2 text-sm">
+            {state.files.map((f) => (
+              <li key={f.name} className="font-mono text-xs">
+                <span className="text-accent">saved</span> {f.name}
+                {f.evidence && captured.includes(f.evidence) && (
+                  <span className="block font-sans text-muted">{incident.evidence[f.evidence]?.summary}</span>
+                )}
+              </li>
+            ))}
+            {lost.map((e) => (
+              <li key={e} className="border-l-2 border-danger pl-3">
+                <span className="font-mono text-xs text-danger">lost</span> {incident.evidence[e]?.summary}
+              </li>
+            ))}
+          </ul>
+        )}
+      </aside>
     </div>
   )
 }

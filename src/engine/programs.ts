@@ -7,6 +7,8 @@ export type FlagSpec = {
   /** Every spelling, e.g. ["-n", "--namespace"]. */
   spellings: readonly string[]
   takesValue?: boolean
+  /** The subcommands this flag belongs to; absent means every subcommand. */
+  only?: readonly string[]
 }
 
 export type ProgramSpec = {
@@ -25,14 +27,22 @@ const kubectlFlags: FlagSpec[] = [
   { name: 'selector', spellings: ['-l', '--selector'], takesValue: true },
   { name: 'all-namespaces', spellings: ['-A', '--all-namespaces'] },
   { name: 'container', spellings: ['-c', '--container'], takesValue: true },
-  { name: 'previous', spellings: ['-p', '--previous'] },
-  { name: 'follow', spellings: ['-f', '--follow'] },
+  { name: 'previous', spellings: ['-p', '--previous'], only: ['logs'] },
+  { name: 'follow', spellings: ['-f', '--follow'], only: ['logs'] },
+  { name: 'filename', spellings: ['-f', '--filename'], takesValue: true, only: ['apply', 'create', 'delete', 'replace', 'diff', 'get', 'describe'] },
+  { name: 'patch', spellings: ['-p', '--patch'], takesValue: true, only: ['patch'] },
   { name: 'watch', spellings: ['-w', '--watch'] },
   { name: 'stdin', spellings: ['-i', '--stdin'] },
   { name: 'tty', spellings: ['-t', '--tty'] },
   { name: 'tail', spellings: ['--tail'], takesValue: true },
   { name: 'since', spellings: ['--since'], takesValue: true },
   { name: 'revision', spellings: ['--revision'], takesValue: true },
+  { name: 'to-revision', spellings: ['--to-revision'], takesValue: true },
+  { name: 'replicas', spellings: ['--replicas'], takesValue: true },
+  { name: 'image', spellings: ['--image'], takesValue: true },
+  { name: 'grace-period', spellings: ['--grace-period'], takesValue: true },
+  { name: 'all', spellings: ['--all'] },
+  { name: 'force', spellings: ['--force'] },
   { name: 'sort-by', spellings: ['--sort-by'], takesValue: true },
   { name: 'timestamps', spellings: ['--timestamps'] },
   { name: 'show-labels', spellings: ['--show-labels'] },

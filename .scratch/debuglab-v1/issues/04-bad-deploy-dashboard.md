@@ -4,10 +4,14 @@
 
 **Blocked by:** 03 Investigate Bad Deploy in the terminal
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Alert panel shows condition and start time
-- [ ] Four golden-signal graphs with deploy markers
-- [ ] Log view with search and level filter
-- [ ] Deploy history list
-- [ ] Dashboard data comes from the Incident definition for the current named state
+- [x] Alert panel shows condition and start time
+- [x] Four golden-signal graphs with deploy markers
+- [x] Log view with search and level filter
+- [x] Deploy history list
+- [x] Dashboard data comes from the Incident definition for the current named state
+
+## Comments
+
+- Done. Each named state carries its dashboard: alert status, four golden-signal series with deploy and action markers, deploy history, and the load balancer access log (nginx). The log view shows access logs rather than application logs on purpose: they survive a rollback, while application logs live only in the pods, which is what makes evidence capture matter. Graph line colours were checked with the dataviz palette validator against both theme surfaces.

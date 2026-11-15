@@ -1,11 +1,27 @@
 import { kubeResourceTypes, programs, type FlagSpec, type ProgramSpec } from './programs'
 
+/** Visit each character with whether it sits inside quotes. Quote characters themselves are reported as quoted. */
+function eachChar(text: string, visit: (ch: string, quoted: boolean) => void): void {
+  let quote: string | null = null
+  for (const ch of text) {
+    if (quote) {
+      if (ch === quote) quote = null
+      visit(ch, true)
+    } else if (ch === '"' || ch === "'") {
+      quote = ch
+      visit(ch, true)
+    } else {
+      visit(ch, false)
+    }
+  }
+}
+
 /** Split a command line into words, honouring single and double quotes. */
 export function tokenize(text: string): string[] {
   const words: string[] = []
   let current = ''
-  let quote: string | null = null
   let inWord = false
+  let quote: string | null = null
   for (const ch of text) {
     if (quote) {
       if (ch === quote) quote = null
@@ -28,42 +44,51 @@ export function tokenize(text: string): string[] {
 
 /** Split a command line on pipes that are not inside quotes. */
 export function splitPipes(text: string): string[] {
-  const parts: string[] = []
-  let current = ''
-  let quote: string | null = null
-  for (const ch of text) {
-    if (quote) {
-      if (ch === quote) quote = null
-    } else if (ch === '"' || ch === "'") {
-      quote = ch
-    } else if (ch === '|') {
-      parts.push(current)
-      current = ''
-      continue
-    }
-    current += ch
-  }
-  parts.push(current)
+  const parts: string[] = ['']
+  eachChar(text, (ch, quoted) => {
+    if (ch === '|' && !quoted) parts.push('')
+    else parts[parts.length - 1] += ch
+  })
   return parts.map((p) => p.trim())
 }
 
-type Parsed = { positionals: string[]; flags: Map<string, string | true> }
+export type Redirect = { command: string; file?: string; append: boolean }
 
-function findFlag(spec: ProgramSpec, spelling: string): FlagSpec | undefined {
-  return spec.flags?.find((f) => f.spellings.includes(spelling))
+/** Separate a trailing `> file` or `>> file` (outside quotes) from the command. `2>&1` is ignored. */
+export function splitRedirect(text: string): Redirect {
+  const marks: number[] = []
+  let i = 0
+  eachChar(text, (ch, quoted) => {
+    if (ch === '>' && !quoted) marks.push(i)
+    i++
+  })
+  const chars = [...text]
+  const real = marks.filter((at) => chars[at - 1] !== '2' && chars[at + 1] !== '&' && chars[at - 1] !== '>')
+  const at = real.at(-1)
+  if (at === undefined) return { command: text.replace(/\s2>&1\b/, '').trim(), append: false }
+  const append = chars[at + 1] === '>'
+  const file = tokenize(chars.slice(at + (append ? 2 : 1)).join(''))[0]
+  const command = chars.slice(0, at).join('').replace(/\s2>&1\b/, '').trim()
+  return { command, file, append }
+}
+
+type Parsed = { positionals: string[]; inner: string[]; flags: Map<string, string | true> }
+
+function findFlag(spec: ProgramSpec, spelling: string, subcommand: string | undefined): FlagSpec | undefined {
+  return spec.flags?.find(
+    (f) => f.spellings.includes(spelling) && (!f.only || (subcommand !== undefined && f.only.includes(subcommand))),
+  )
 }
 
 function parse(program: string, args: string[]): Parsed {
   const spec: ProgramSpec = programs[program] ?? { clustersFreely: true }
   const positionals: string[] = []
   const flags = new Map<string, string | true>()
+  const sub = () => (spec.subcommands ? positionals[0] : undefined)
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!
-    if (arg === '--') {
-      positionals.push('--', ...args.slice(i + 1))
-      break
-    }
+    if (arg === '--') return { positionals, inner: args.slice(i + 1), flags }
     if (i === 0 && spec.bareCluster && /^[a-z]+$/i.test(arg)) {
       for (const ch of arg) flags.set(`-${ch}`, true)
       continue
@@ -71,7 +96,7 @@ function parse(program: string, args: string[]): Parsed {
     if (arg.startsWith('--') && arg.length > 2) {
       const eq = arg.indexOf('=')
       const spelling = eq === -1 ? arg : arg.slice(0, eq)
-      const flag = findFlag(spec, spelling)
+      const flag = findFlag(spec, spelling, sub())
       const name = flag?.name ?? spelling
       if (eq !== -1) flags.set(name, arg.slice(eq + 1))
       else if (flag?.takesValue && i + 1 < args.length) flags.set(name, args[++i]!)
@@ -79,20 +104,20 @@ function parse(program: string, args: string[]): Parsed {
       continue
     }
     if (arg.startsWith('-') && arg.length > 1 && !/^-\d/.test(arg)) {
-      const exact = findFlag(spec, arg)
+      const exact = findFlag(spec, arg, sub())
       if (exact) {
         if (exact.takesValue && i + 1 < args.length) flags.set(exact.name, args[++i]!)
         else flags.set(exact.name, true)
         continue
       }
-      const first = findFlag(spec, arg.slice(0, 2))
+      const first = findFlag(spec, arg.slice(0, 2), sub())
       if (first?.takesValue) {
         flags.set(first.name, arg.slice(2))
         continue
       }
       const letters = [...arg.slice(1)]
-      if (spec.clustersFreely || letters.every((ch) => findFlag(spec, `-${ch}`))) {
-        for (const ch of letters) flags.set(findFlag(spec, `-${ch}`)?.name ?? `-${ch}`, true)
+      if (spec.clustersFreely || letters.every((ch) => findFlag(spec, `-${ch}`, sub()))) {
+        for (const ch of letters) flags.set(findFlag(spec, `-${ch}`, sub())?.name ?? `-${ch}`, true)
         continue
       }
       flags.set(arg, true)
@@ -100,14 +125,11 @@ function parse(program: string, args: string[]): Parsed {
     }
     positionals.push(arg)
   }
-  return { positionals, flags }
+  return { positionals, inner: [], flags }
 }
 
 /** kubectl resource words: "po" → "pod", "deploy/api" → "deployment/api", "get pods api-1" → "get pod/api-1". */
-function normaliseKubePositionals(positionals: string[]): string[] {
-  const end = positionals.indexOf('--')
-  const head = end === -1 ? positionals : positionals.slice(0, end)
-  const tail = end === -1 ? [] : positionals.slice(end)
+function normaliseKubePositionals(head: string[]): string[] {
   const out: string[] = []
   for (let i = 0; i < head.length; i++) {
     const word = head[i]!
@@ -132,25 +154,30 @@ function normaliseKubePositionals(positionals: string[]): string[] {
       out.push(type)
     }
   }
-  return [...out, ...tail]
+  return out
+}
+
+/** A command reduced to the parts that decide what it means. */
+export type Analysis = {
+  /** Equal for every spelling that means the same thing. */
+  key: string
+  program: string
+  /** Positional words before any `--`, normalised (for kubectl: subcommand, then "type/name"). */
+  words: readonly string[]
+  /** The command after `--`, as for `kubectl exec POD -- env`. */
+  inner: readonly string[]
+  flags: ReadonlyMap<string, string | true>
+  /** `kubectl logs --tail N`: applied by the engine rather than matched, so every N works. */
+  tail?: number
 }
 
 /**
- * The canonical form of one command (no pipes): equal for every spelling that means the same thing.
+ * Analyse one command (no pipes or redirects).
  * `defaultNamespace` is the namespace of the Learner's kube context, so naming it is optional.
  */
-export function canonical(text: string, defaultNamespace: string): string {
-  return analyse(text, defaultNamespace).key
-}
-
-/**
- * The canonical key plus any part of the command the engine applies itself rather than matching on:
- * `kubectl logs --tail N` works for every N, so N is returned separately.
- */
-export function analyse(text: string, defaultNamespace: string): { key: string; tail?: number } {
-  const [program, ...args] = tokenize(text)
-  if (!program) return { key: '' }
-  const { positionals, flags } = parse(program, args)
+export function analyse(text: string, defaultNamespace: string): Analysis {
+  const [program = '', ...args] = tokenize(text)
+  const { positionals, inner, flags } = parse(program, args)
   let words = positionals
   let tail: number | undefined
   if (program === 'kubectl') {
@@ -168,5 +195,11 @@ export function analyse(text: string, defaultNamespace: string): { key: string; 
       return value === true ? `--${bare}` : `--${bare}=${value}`
     })
     .sort()
-  return { key: [program, ...words, ...flagWords].join(' '), tail }
+  const innerWords = inner.length > 0 ? ['--', ...inner] : []
+  const key = program ? [program, ...words, ...flagWords, ...innerWords].join(' ') : ''
+  return { key, program, words, inner, flags, tail }
+}
+
+export function canonical(text: string, defaultNamespace: string): string {
+  return analyse(text, defaultNamespace).key
 }

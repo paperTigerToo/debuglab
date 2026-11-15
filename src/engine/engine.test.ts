@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { complete, prompt, start, step } from './engine'
+import { dashboardFixture } from './fixtures'
 import { defineIncident, type Line, type SessionState } from './types'
 
 const incident = defineIncident({
@@ -24,7 +25,10 @@ const incident = defineIncident({
     },
     { match: ['ps aux'], output: 'USER PID' },
   ],
-  completions: ['api-7f9c-2xk'],
+  evidence: {},
+  resources: ['pod/api-7f9c-2xk', 'deployment/api'],
+  shellPodPrefix: 'api-',
+  dashboard: { failing: dashboardFixture('firing') },
   expertPath: [
     { command: 'kubectl get pods', why: '', reaches: ['replaced'] },
     { command: 'kubectl logs deploy/api --tail=3', why: '', reaches: ['throws'] },

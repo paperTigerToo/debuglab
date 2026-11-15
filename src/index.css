@@ -13,6 +13,8 @@
   --warn: #f5b84a;
   --danger: #ff5d6c;
   --info: #5cc8ff;
+  /* Graph line: validated against --panel with the dataviz palette checker. */
+  --series: #2f9bdc;
 }
 
 :root[data-theme="light"] {
@@ -27,6 +29,7 @@
   --warn: #9a6200;
   --danger: #c62837;
   --info: #0a6fa8;
+  --series: #0a6fa8;
 }
 
 @theme inline {
@@ -40,6 +43,7 @@
   --color-warn: var(--warn);
   --color-danger: var(--danger);
   --color-info: var(--info);
+  --color-series: var(--series);
   --font-mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
