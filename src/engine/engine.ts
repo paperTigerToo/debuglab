@@ -2,12 +2,13 @@
 // (new session state, what to display). It knows nothing about the interface.
 import { analyse, canonical, splitPipes, splitRedirect, tokenize, type Analysis } from './normalise'
 import { kubeResourceTypes, programs } from './programs'
+import { revealHint } from './hints'
+import { evidenceStatus } from './session'
 import { closest } from './suggest'
-import { applyTextTool, fileOperand, isTextTool } from './text-tools'
+import { applyTextTool, fileOperand, fileReadingCommands, isTextTool } from './text-tools'
 import type {
   CommandEntry,
   Completion,
-  Dashboard,
   IncidentDefinition,
   Input,
   Line,
@@ -19,7 +20,11 @@ import type {
   TimelineEntry,
 } from './types'
 
-type Entry = CommandEntry<string, string, string>
+type AnyCommandEntry = CommandEntry<string, string, string>
+
+export { debrief, type Debrief } from './debrief'
+export { currentHint, hintsUsed, type HintView } from './hints'
+export { dashboard, evidenceStatus, harmStopped } from './session'
 
 export function start(definition: IncidentDefinition): SessionState {
   return {
@@ -29,6 +34,7 @@ export function start(definition: IncidentDefinition): SessionState {
     findings: [],
     files: [],
     destroyed: [],
+    hintTiers: {},
   }
 }
 
@@ -37,20 +43,28 @@ export function prompt(state: SessionState): string {
   return state.location.kind === 'container' ? `root@${state.location.pod}:/app#` : 'you@laptop:~$'
 }
 
-/** What the dashboard shows for the Incident's current named state. */
-export function dashboard(definition: IncidentDefinition, state: SessionState): Dashboard {
-  return definition.dashboard[state.namedState]!
-}
-
-/** Which perishable evidence the Learner saved in time, and which a mutating command destroyed first. */
-export function evidenceStatus(_definition: IncidentDefinition, state: SessionState) {
-  const captured = [...new Set(state.files.flatMap((f) => (f.evidence ? [f.evidence] : [])))]
-  return { captured, lost: state.destroyed.filter((e) => !captured.includes(e)) }
-}
-
 export function step(definition: IncidentDefinition, state: SessionState, input: Input): StepResult {
-  const text = input.text.trim()
-  const echo: Line = { kind: 'input', prompt: prompt(state), text: input.text }
+  if (input.kind === 'hint') return { state: state.outcome ? state : revealHint(definition, state), display: [] }
+  if (input.kind === 'finish') return { state: finish(definition, state, input.rootCause, input.mitigation), display: [] }
+  return runCommand(definition, state, input.text)
+}
+
+function finish(definition: IncidentDefinition, state: SessionState, rootCause: string, mitigation: string): SessionState {
+  const known = definition.rootCauses.some((c) => c.id === rootCause) && definition.mitigations.some((m) => m.id === mitigation)
+  if (!known || state.outcome) return state
+  const { pending: _, ...rest } = state
+  return { ...rest, outcome: { rootCause, mitigation } }
+}
+
+function runCommand(definition: IncidentDefinition, state: SessionState, typed: string): StepResult {
+  const text = typed.trim()
+  const echo: Line = { kind: 'input', prompt: prompt(state), text: typed }
+  if (state.outcome) {
+    return {
+      state,
+      display: [echo, { kind: 'notice', text: 'This Incident is over. Read the Debrief, or restart the Incident to try again.' }],
+    }
+  }
   if (state.pending) return answerConfirmation(definition, state, echo, text)
   if (!text) return { state, display: [echo] }
 
@@ -74,6 +88,13 @@ export function step(definition: IncidentDefinition, state: SessionState, input:
 
   const redirect = splitRedirect(text)
   const [first = '', ...stages] = splitPipes(redirect.command)
+  const savesFile = redirect.file !== undefined || stages.some((stage) => tokenize(stage)[0] === 'tee')
+  if (savesFile && state.location.kind === 'container') {
+    return reply('not-simulated', {
+      kind: 'notice',
+      text: 'A file written inside the container would vanish with it, so the lab does not keep one. Leave the shell (exit) and save from your own machine: kubectl exec POD -- COMMAND > FILE.',
+    })
+  }
   const source = resolveSource(definition, state, first, state.location)
 
   switch (source.kind) {
@@ -83,7 +104,7 @@ export function step(definition: IncidentDefinition, state: SessionState, input:
       return { state: record('ran', { ...state, location: source.location }), display: [echo] }
     case 'confirm':
       return {
-        state: { ...state, pending: { text } },
+        state: { ...state, pending: { text, entry: definition.commands.indexOf(source.entry) } },
         display: [
           echo,
           { kind: 'warning', text: `${source.entry.mutating!.warning}\nThis changes the Target System.` },
@@ -93,23 +114,26 @@ export function step(definition: IncidentDefinition, state: SessionState, input:
 
   let output = source.output
   let linesShown = true
+  // Whether the output is still everything the command printed, so saving it captures the evidence whole.
+  let whole = source.whole
   const saved: SavedFile[] = []
   for (const stage of stages) {
     const [program = '', file] = tokenize(stage)
     if (program === 'tee' && file) {
-      saved.push(savedFile(definition, state, file, output, source))
+      saved.push(savedFile(state, file, output, source, whole))
       continue
     }
     const filtered = applyTextTool(stage, output)
     if (filtered === undefined) return reply('not-simulated', notSimulated(program || stage))
     output = filtered.output
     linesShown &&= filtered.linesShown
+    whole = false
   }
 
   if (redirect.file) {
     const existing = state.files.find((f) => f.name === redirect.file)
     const content = redirect.append && existing ? `${existing.content}\n${output}` : output
-    saved.push(savedFile(definition, state, redirect.file, content, source))
+    saved.push(savedFile(state, redirect.file, content, source, whole))
     return { state: record('ran', withFiles(state, saved)), display: [echo] }
   }
 
@@ -123,10 +147,10 @@ export function step(definition: IncidentDefinition, state: SessionState, input:
 // Where a command's output comes from
 
 type Source =
-  | { kind: 'output'; output: string; entry?: Entry; key: string }
+  | { kind: 'output'; output: string; entry?: AnyCommandEntry; key: string; whole: boolean }
   | { kind: 'reply'; result: TimelineEntry['result']; line: Line }
   | { kind: 'enter-shell'; location: Location }
-  | { kind: 'confirm'; entry: Entry }
+  | { kind: 'confirm'; entry: AnyCommandEntry }
 
 const SHELLS: Record<string, 'sh' | 'bash'> = { sh: 'sh', '/bin/sh': 'sh', bash: 'bash', '/bin/bash': 'bash' }
 
@@ -143,9 +167,10 @@ function resolveSource(definition: IncidentDefinition, state: SessionState, comm
   const entry = findEntry(definition, state, analysis, at)
   if (entry) {
     if (entry.mutating) return { kind: 'confirm', entry }
-    let output = outputFor(entry, state)!
-    if (analysis.tail !== undefined) output = analysis.tail === 0 ? '' : output.split('\n').slice(-analysis.tail).join('\n')
-    return { kind: 'output', output, entry, key: analysis.key }
+    const full = outputFor(entry, state)!
+    const tail = analysis.tail
+    const output = tail === undefined ? full : tail === 0 ? '' : full.split('\n').slice(-tail).join('\n')
+    return { kind: 'output', output, entry, key: analysis.key, whole: output === full }
   }
 
   if (at.kind === 'container' && (program === 'kubectl' || !programs[program])) {
@@ -157,14 +182,15 @@ function resolveSource(definition: IncidentDefinition, state: SessionState, comm
 
 function findEntry(definition: IncidentDefinition, state: SessionState, analysis: Analysis, at: Location) {
   return definition.commands.find(
-    (c) =>
-      (c.where ?? 'local') === at.kind &&
-      outputFor(c, state) !== undefined &&
-      c.match.some((m) => canonical(m, definition.namespace) === analysis.key),
+    (c) => (c.where ?? 'local') === at.kind && outputFor(c, state) !== undefined && matchesKey(definition, c, analysis.key),
   )
 }
 
-function outputFor(entry: Entry, state: SessionState): string | undefined {
+function matchesKey(definition: IncidentDefinition, entry: AnyCommandEntry, key: string): boolean {
+  return entry.match.some((m) => canonical(m, definition.namespace) === key)
+}
+
+function outputFor(entry: AnyCommandEntry, state: SessionState): string | undefined {
   return perState(entry.output, state.namedState)
 }
 
@@ -198,7 +224,7 @@ function kubectlExec(definition: IncidentDefinition, state: SessionState, analys
 /** `cat FILE`, `grep PATTERN FILE`, `ls` and friends, run against the files the Learner saved. */
 function readSavedFile(definition: IncidentDefinition, state: SessionState, command: string, program: string): Source | undefined {
   if (program === 'ls' && tokenize(command).length === 1) {
-    return { kind: 'output', output: state.files.map((f) => f.name).join('  '), key: 'ls' }
+    return { kind: 'output', output: state.files.map((f) => f.name).join('  '), key: 'ls', whole: false }
   }
   if (!isTextTool(program)) return undefined
   const { stage, file: name } = fileOperand(command)
@@ -207,20 +233,20 @@ function readSavedFile(definition: IncidentDefinition, state: SessionState, comm
   if (!file) return error(`${program}: ${name}: No such file or directory`)
   const result = applyTextTool(stage, file.content)
   if (!result) return { kind: 'reply', result: 'not-simulated', line: notSimulated(program) }
-  const entry = definition.commands.find((c) => c.match.some((m) => canonical(m, definition.namespace) === file.source))
-  // A count is not reading the lines, so it reaches no findings.
-  return { kind: 'output', output: result.output, entry: result.linesShown ? entry : undefined, key: file.source }
+  const entry = definition.commands.find((c) => matchesKey(definition, c, file.source))
+  // A count is not reading the lines, so it reaches no findings. A copy of a file is not new evidence.
+  return { kind: 'output', output: result.output, entry: result.linesShown ? entry : undefined, key: file.source, whole: false }
 }
 
 function savedFile(
-  _definition: IncidentDefinition,
   state: SessionState,
   name: string,
   content: string,
   source: Extract<Source, { kind: 'output' }>,
+  whole: boolean,
 ): SavedFile {
   const evidence = source.entry?.evidence
-  const stillExists = evidence !== undefined && !state.destroyed.includes(evidence)
+  const stillExists = whole && evidence !== undefined && !state.destroyed.includes(evidence)
   const previous = state.files.find((f) => f.name === name)
   return {
     name,
@@ -236,7 +262,7 @@ function withFiles(state: SessionState, saved: readonly SavedFile[]): SessionSta
   return { ...state, files: [...state.files.filter((f) => !names.has(f.name)), ...saved] }
 }
 
-function reachedFindings(entry: Entry, output: string, linesShown: boolean, known: readonly string[]): string[] {
+function reachedFindings(entry: AnyCommandEntry, output: string, linesShown: boolean, known: readonly string[]): string[] {
   if (!linesShown) return []
   return (entry.reveals ?? [])
     .filter((r) => (typeof r === 'string' ? output.trim() !== '' : output.includes(r.seenIn)))
@@ -257,11 +283,11 @@ function answerConfirmation(definition: IncidentDefinition, state: SessionState,
       display: [echo, { kind: 'notice', text: 'Cancelled. Nothing was changed.' }],
     }
   }
-  const command = splitPipes(splitRedirect(pendingText).command)[0] ?? ''
-  const entry = findEntry(definition, state, analyse(command, definition.namespace), state.location)!
+  // The entry was found when the command was typed, wherever it runs (in a pod via kubectl exec, say).
+  const entry = definition.commands[state.pending!.entry]!
   const mutation = entry.mutating!
   const destroyedNow = (mutation.destroys ?? []).filter((e) => !state.destroyed.includes(e))
-  const captured = evidenceStatus(definition, state).captured
+  const captured = evidenceStatus(state).captured
   const lostNow = destroyedNow.filter((e) => !captured.includes(e))
   const lines: Line[] = [
     echo,
@@ -372,7 +398,6 @@ const HELP = [
 // Tab completion
 
 const BUILTINS = ['clear', 'help', 'exit']
-const FILE_TOOLS = ['cat', 'grep', 'head', 'tail', 'less', 'ls']
 
 /**
  * Complete the last word of `text`. Candidates come from the scripted commands for the current location
@@ -390,10 +415,10 @@ export function complete(definition: IncidentDefinition, state: SessionState, te
   const local = here === 'local'
 
   let candidates: string[]
-  if (local && position > 0 && FILE_TOOLS.includes(typed[0]!) && state.files.length > 0) {
+  if (local && position > 0 && fileReadingCommands.includes(typed[0]!) && state.files.length > 0) {
     candidates = state.files.map((f) => f.name)
   } else if (position === 0) {
-    candidates = [...scripted.map((words) => words[0]!), ...BUILTINS, ...(local && state.files.length ? FILE_TOOLS : [])]
+    candidates = [...scripted.map((words) => words[0]!), ...BUILTINS, ...(local && state.files.length ? fileReadingCommands : [])]
   } else {
     const following = scripted
       .filter((words) => typed.every((w, i) => words[i] === w))

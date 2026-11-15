@@ -1,5 +1,5 @@
 // Test helpers shared by the engine's tests.
-import type { Dashboard } from './types'
+import type { Dashboard, MitigationOption, Postmortem } from './types'
 
 export function dashboardFixture(status: 'firing' | 'resolved', summary: string = status): Dashboard {
   return {
@@ -11,3 +11,12 @@ export function dashboardFixture(status: 'firing' | 'resolved', summary: string 
     logs: [],
   }
 }
+
+/** The finishing parts of a definition, for fixtures that do not test finishing. */
+export const finishFixture = {
+  hints: [],
+  rootCauses: [{ id: 'cause', label: 'The cause', correct: true }],
+  mitigations: [{ id: 'rollback', label: 'Roll back', verdict: 'best', explanation: '' }] as MitigationOption[],
+  postmortem: { summary: '', impact: '', timeline: [], rootCause: '', resolution: '', actionItems: [] } as Postmortem,
+  prevention: [],
+} as const

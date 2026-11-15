@@ -137,3 +137,85 @@ test('an unknown Incident address shows not found', async ({ page }) => {
   await page.goto('lab/no-such-incident')
   await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible()
 })
+
+async function finish(page: Page, rootCause: RegExp, mitigation: RegExp) {
+  await page.getByRole('button', { name: /finish the Incident/ }).click()
+  const form = page.getByRole('form', { name: 'Finish the Incident' })
+  await form.getByRole('radio', { name: rootCause }).check()
+  await form.getByRole('radio', { name: mitigation }).check()
+  await form.getByRole('button', { name: 'Finish and see the Debrief' }).click()
+}
+
+const expertPath = [
+  'kubectl get pods',
+  'kubectl rollout history deployment/pantry-api',
+  'kubectl logs deployment/pantry-api --tail=20',
+  'kubectl logs deployment/pantry-api > pantry-api-v2.14.0.log',
+  'kubectl rollout undo deployment/pantry-api',
+  'y',
+  'grep -i warn pantry-api-v2.14.0.log',
+  'kubectl rollout history deployment/pantry-api --revision=42',
+]
+
+test('completing Bad Deploy by its Expert Path reaches a clean Debrief, saved across reloads', async ({ page }) => {
+  await page.goto('lab/bad-deploy')
+  for (const command of expertPath) await type(page, command)
+  await finish(page, /still sets the old name/, /Roll back pantry-api to v2.13.1/)
+
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Debrief')
+  await expect(page.getByRole('region', { name: 'You stopped the harm' })).toContainText('The right first move')
+  await expect(page.getByRole('region', { name: 'You found the Root Cause' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Evidence' })).toContainText('kept')
+  await expect(page.getByRole('region', { name: 'Expert Path' }).getByLabel('missed')).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Sample postmortem' })).toContainText('Action items')
+
+  await page.getByRole('link', { name: 'Back to all Incidents' }).click()
+  const card = page.getByRole('link', { name: /Bad Deploy/ })
+  await expect(card).toContainText('✓ completed')
+  await page.reload()
+  await expect(card).toContainText('✓ completed')
+
+  await page.getByRole('button', { name: 'Reset progress' }).click()
+  await page.getByRole('button', { name: 'Reset progress' }).click()
+  await expect(card).toContainText('not attempted')
+})
+
+test('mitigating first and blaming payments gets two separate verdicts and the contradicting Findings', async ({ page }) => {
+  await page.goto('lab/bad-deploy')
+  await type(page, 'kubectl rollout undo deployment/pantry-api')
+  await type(page, 'y')
+  await finish(page, /payments service is down/, /Roll back pantry-api/)
+  await expect(page.getByRole('region', { name: 'You stopped the harm' })).toBeVisible()
+  const cause = page.getByRole('region', { name: 'That is not the Root Cause' })
+  await expect(cause).toContainText('The request was never sent')
+  await expect(cause).toContainText('A Finding you never reached')
+  await expect(page.getByRole('region', { name: 'Evidence' })).toContainText('lost')
+})
+
+test('Hints reveal three tiers and follow the investigation', async ({ page }) => {
+  await page.goto('lab/bad-deploy')
+  const hint = page.getByRole('complementary', { name: 'Hint' })
+  await hint.getByRole('button', { name: 'Ask for a Hint' }).click()
+  await expect(hint).toContainText('Are the pantry-api pods running, crashing, or new?')
+  await hint.getByRole('button', { name: 'Show the Playbook Entry' }).click()
+  await expect(hint).toContainText('Are the pods running, and since when?')
+  await hint.getByRole('button', { name: 'Show the exact command' }).click()
+  await expect(hint.getByRole('code')).toHaveText('kubectl get pods')
+  await expect(hint.getByRole('button')).toHaveCount(0)
+
+  await type(page, 'kubectl get pods')
+  await expect(hint).not.toContainText('crashing, or new')
+  await hint.getByRole('button', { name: 'Ask for a Hint' }).click()
+  await expect(hint).toContainText('What changed shortly before the alert fired?')
+})
+
+test('a later, weaker attempt does not undo a completed Incident', async ({ page }) => {
+  await page.goto('lab/bad-deploy')
+  for (const command of expertPath) await type(page, command)
+  await finish(page, /still sets the old name/, /Roll back pantry-api to v2.13.1/)
+  await page.getByRole('button', { name: 'Restart Incident' }).click()
+  await page.getByRole('group', { name: 'Confirm restart' }).getByRole('button', { name: 'Restart' }).click()
+  await finish(page, /payments service is down/, /Restart the pantry-api pods/)
+  await page.getByRole('link', { name: 'Back to all Incidents' }).click()
+  await expect(page.getByRole('link', { name: /Bad Deploy/ })).toContainText('✓ completed')
+})

@@ -10,3 +10,7 @@
 - [ ] Search across question, command and term
 - [ ] Copy button on each command
 - [ ] Browser test searches the Playbook and opens an entry; a deep link to an entry loads directly
+
+## Comments
+
+- From ticket 07: Bad Deploy's Hints name Playbook Entries by question text (`playbook` field). Give each Entry a stable identifier, switch the Hints to it, and link it from the Hint panel and the Debrief.

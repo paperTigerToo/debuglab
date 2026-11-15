@@ -5,8 +5,8 @@ import { SignalChart } from './SignalChart'
 const whole = (n: number) => String(Math.round(n))
 const oneDecimal = (n: number) => (n < 10 ? n.toFixed(1) : String(Math.round(n)))
 
-export function AlertPanel({ alert, data }: { alert: Alert; data: DashboardData }) {
-  const firing = data.alert.status === 'firing'
+export function AlertPanel({ alert, status }: { alert: Alert; status: DashboardData['alert'] }) {
+  const firing = status.status === 'firing'
   return (
     <section
       aria-label="Alert"
@@ -21,7 +21,7 @@ export function AlertPanel({ alert, data }: { alert: Alert; data: DashboardData 
         <span className="font-mono text-sm font-semibold">{alert.name}</span>
         <span className="font-mono text-xs text-muted">since {alert.startedAt}</span>
       </div>
-      <p className="mt-2 text-sm">{data.alert.summary}</p>
+      <p className="mt-2 text-sm">{status.summary}</p>
       <p className="mt-1 font-mono text-xs text-muted">condition: {alert.condition}</p>
     </section>
   )

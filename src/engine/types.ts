@@ -81,10 +81,56 @@ export type Dashboard = {
   logs: readonly AccessLogLine[]
 }
 
-export type ExpertStep<F extends string> = {
+export type ExpertStep<S extends string, F extends string, E extends string> = {
   command: string
   why: string
+  /** Findings this step reaches; the Debrief counts the step covered once they are all reached. */
   reaches?: readonly F[]
+  /** For a step that reaches no Finding: what it achieves, such as captured evidence or a mitigated state. */
+  achieves?: HintGoal<S, F, E>
+}
+
+/** One answer to "what caused this?". Exactly one per Incident is correct. */
+export type RootCauseOption<F extends string> = {
+  id: string
+  label: string
+  correct?: true
+  /** For a wrong answer: the Findings that rule it out, and why. */
+  contradictedBy?: readonly { finding: F; why: string }[]
+}
+
+export type MitigationOption = {
+  id: string
+  label: string
+  /** best: the right first move; works: stops the harm at a cost; no-effect; harmful: makes it worse. */
+  verdict: 'best' | 'works' | 'no-effect' | 'harmful'
+  explanation: string
+}
+
+/** What a Hint leads to: a Finding, captured evidence, or a named state such as "mitigated". */
+export type HintGoal<S extends string, F extends string, E extends string> =
+  | { finding: F }
+  | { captured: E }
+  | { state: S }
+
+/** Graduated help towards one goal: the question, then the Playbook Entry, then the exact command. */
+export type Hint<S extends string, F extends string, E extends string> = {
+  goal: HintGoal<S, F, E>
+  /** Skip this Hint when the evidence it relies on was lost. */
+  needs?: { evidence: E }
+  question: string
+  /** The Playbook Entry that answers the question, by its question. */
+  playbook: string
+  command: string
+}
+
+export type Postmortem = {
+  summary: string
+  impact: string
+  timeline: readonly { at: string; event: string }[]
+  rootCause: string
+  resolution: string
+  actionItems: readonly string[]
 }
 
 export type IncidentDefinition<S extends string = string, F extends string = string, E extends string = string> = {
@@ -105,7 +151,14 @@ export type IncidentDefinition<S extends string = string, F extends string = str
   shellPodPrefix: string
   commands: readonly CommandEntry<NoInfer<S>, NoInfer<F>, NoInfer<E>>[]
   dashboard: Record<NoInfer<S>, Dashboard>
-  expertPath: readonly ExpertStep<NoInfer<F>>[]
+  expertPath: readonly ExpertStep<NoInfer<S>, NoInfer<F>, NoInfer<E>>[]
+  /** In the order an investigation would usually reach their goals. */
+  hints: readonly Hint<NoInfer<S>, NoInfer<F>, NoInfer<E>>[]
+  rootCauses: readonly RootCauseOption<NoInfer<F>>[]
+  mitigations: readonly MitigationOption[]
+  postmortem: Postmortem
+  /** How this Incident could have been prevented. */
+  prevention: readonly string[]
 }
 
 export type Location = { kind: 'local' } | { kind: 'container'; pod: string; shell: 'sh' | 'bash' }
@@ -134,10 +187,17 @@ export type SessionState = {
   /** Evidence destroyed by a mutating command, captured or not. */
   destroyed: readonly string[]
   /** A mutating command waiting for the Learner to confirm. */
-  pending?: { text: string }
+  pending?: { text: string; entry: number }
+  /** How many tiers of each Hint (by index) the Learner has revealed. */
+  hintTiers: Readonly<Record<number, number>>
+  /** Set when the Learner declares the Root Cause and chooses a Mitigation; the Incident is then over. */
+  outcome?: Outcome
 }
 
-export type Input = { kind: 'command'; text: string }
+/** The Learner's conclusion: the Root Cause they declare and the Mitigation they would apply. */
+export type Outcome = { rootCause: string; mitigation: string }
+
+export type Input = { kind: 'command'; text: string } | { kind: 'hint' } | ({ kind: 'finish' } & Outcome)
 
 export type Line =
   | { kind: 'input'; prompt: string; text: string }

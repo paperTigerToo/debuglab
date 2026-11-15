@@ -161,7 +161,7 @@ ${o.events}`
 
 const rolloutEvents = (age1: string, age2: string, up: string, down: string) =>
   [
-    `  Normal  ScalingReplicaSet  ${pad(age1, 6)}deployment-controller  Scaled up replica set ${up} to 1`,
+    `  Normal  ScalingReplicaSet  ${pad(age1, 6)}deployment-controller  Scaled up replica set ${up} to 1 from 0`,
     `  Normal  ScalingReplicaSet  ${pad(age1, 6)}deployment-controller  Scaled down replica set ${down} to 2 from 3`,
     `  Normal  ScalingReplicaSet  ${pad(age1, 6)}deployment-controller  Scaled up replica set ${up} to 2 from 1`,
     `  Normal  ScalingReplicaSet  ${pad(age2, 6)}deployment-controller  Scaled down replica set ${down} to 1 from 2`,
@@ -287,7 +287,8 @@ const ACTION_AT = 30 // 14:15
 type Phase = 'before' | 'broken' | 'recovered' | 'down'
 
 function signals(phases: Phase[]): Dashboard['signals'] {
-  const requests = phases.map((p, i) => round(p === 'down' ? 0 : 182 + wobble(i, 9), 0))
+  // Customers keep sending requests during an outage; nginx answers them all with 503.
+  const requests = phases.map((_, i) => round(182 + wobble(i, 9), 0))
   const errors = phases.map((p, i) =>
     round(p === 'down' ? 100 : p === 'broken' ? 9.1 + wobble(i, 0.8) : 0.2 + Math.abs(wobble(i, 0.15)), 1),
   )
@@ -316,6 +317,7 @@ const access = (time: string, method: string, path: string, status: number, ms: 
   upstream,
 })
 
+// Upstream addresses nginx forwards to: the v2.14.0 pods, then the rolled-back v2.13.1 pods.
 const [a, b, c] = newPods.map((p) => `${p.ip}:8080`) as [string, string, string]
 const [x, y, z] = rolledBackPods.map((p) => `${p.ip}:8080`) as [string, string, string]
 
@@ -414,7 +416,7 @@ const rollbackMutation = {
   to: 'rolled-back',
   destroys: ['api-logs'],
   consequence:
-    'The v2.13.1 pods replace the v2.14.0 ones over the next minute. Checkout errors stop and the alert resolves. Users are safe; now find out why v2.14.0 failed.',
+    'The v2.13.1 pods replace the v2.14.0 ones over the next minute. Checkout errors stop and the alert resolves. Customers can check out again; now find out why v2.14.0 failed.',
 } as const
 
 const outageMutation = (what: string) =>
@@ -548,7 +550,7 @@ node-c   Ready    <none>          301d   v1.33.4`,
       match: ['kubectl get events', 'kubectl events', 'kubectl get events --sort-by=.lastTimestamp'],
       output: {
         failing: `LAST SEEN   TYPE     REASON              OBJECT                            MESSAGE
-12m         Normal   ScalingReplicaSet   deployment/pantry-api             Scaled up replica set pantry-api-6d8f9c7b54 to 1
+12m         Normal   ScalingReplicaSet   deployment/pantry-api             Scaled up replica set pantry-api-6d8f9c7b54 to 1 from 0
 12m         Normal   Scheduled           pod/pantry-api-6d8f9c7b54-7xk2p   Successfully assigned pantry/pantry-api-6d8f9c7b54-7xk2p to node-b
 12m         Normal   Started             pod/pantry-api-6d8f9c7b54-7xk2p   Started container api
 12m         Normal   Killing             pod/pantry-api-84b7d5f9cd-q8w2d   Stopping container api
@@ -665,17 +667,17 @@ REVISION  CHANGE-CAUSE
       reveals: [findManifest],
     })),
     {
-      match: [
-        'kubectl logs deployment/pantry-api',
-        ...newPods.map((p) => `kubectl logs pod/${p.pod}`),
-        ...rolledBackPods.map((p) => `kubectl logs pod/${p.pod}`),
-      ],
-      output: { failing: failingLogs, 'rolled-back': rolledBackLogs },
+      match: ['kubectl logs deployment/pantry-api', ...newPods.map((p) => `kubectl logs pod/${p.pod}`)],
+      output: { failing: failingLogs },
       evidence: 'api-logs',
       reveals: [
         { finding: 'checkout-fails', seenIn: 'ERR_INVALID_URL' },
         { finding: 'payments-url-missing', seenIn: '"key":"PAYMENTS_URL"' },
       ],
+    },
+    {
+      match: ['kubectl logs deployment/pantry-api', ...rolledBackPods.map((p) => `kubectl logs pod/${p.pod}`)],
+      output: { 'rolled-back': rolledBackLogs },
     },
     {
       match: ['kubectl logs pod/postgres-0'],
@@ -816,10 +818,12 @@ shm              64M     0   64M   0% /dev/shm`),
     {
       command: 'kubectl logs deployment/pantry-api > pantry-api-v2.14.0.log',
       why: 'Checkouts are failing and a rollback will replace these pods. Save their logs before they disappear.',
+      achieves: { captured: 'api-logs' },
     },
     {
       command: 'kubectl rollout undo deployment/pantry-api',
       why: 'Stop the harm: roll back to v2.13.1. The evidence is saved, so investigation can continue afterwards.',
+      achieves: { state: 'rolled-back' },
     },
     {
       command: 'grep -i warn pantry-api-v2.14.0.log',
@@ -831,5 +835,168 @@ shm              64M     0   64M   0% /dev/shm`),
       why: 'What configuration did the Deployment give the v2.14.0 containers?',
       reaches: ['manifest-old-name'],
     },
+  ],
+  hints: [
+    {
+      goal: { finding: 'recent-rollout' },
+      question: 'Start broad. Are the pantry-api pods running, crashing, or new?',
+      playbook: 'Are the pods running, and since when?',
+      command: 'kubectl get pods',
+    },
+    {
+      goal: { finding: 'deploy-correlates' },
+      question: 'The pods are young and healthy. What changed shortly before the alert fired?',
+      playbook: 'What was deployed, and when?',
+      command: 'kubectl rollout history deployment/pantry-api',
+    },
+    {
+      goal: { finding: 'checkout-fails' },
+      needs: { evidence: 'api-logs' },
+      question: 'A release lines up with the alert. What errors is the new version printing?',
+      playbook: 'What is the application logging?',
+      command: 'kubectl logs deployment/pantry-api --tail=20',
+    },
+    {
+      goal: { captured: 'api-logs' },
+      question: 'Customers are failing to check out, so you will want to roll back. What happens to these pods and their logs when you do?',
+      playbook: 'How do I keep evidence before changing anything?',
+      command: 'kubectl logs deployment/pantry-api > pantry-api-v2.14.0.log',
+    },
+    {
+      goal: { state: 'rolled-back' },
+      question: 'Checkouts are still failing. What is the fastest safe way to stop the harm, before you know the cause?',
+      playbook: 'How do I roll back a Deployment?',
+      command: 'kubectl rollout undo deployment/pantry-api',
+    },
+    {
+      goal: { finding: 'payments-url-missing' },
+      needs: { evidence: 'api-logs' },
+      question: 'The payments address is "undefined". Did the service complain about its configuration when it started?',
+      playbook: 'What is the application logging?',
+      command: 'grep -i warn pantry-api-v2.14.0.log',
+    },
+    {
+      goal: { finding: 'manifest-old-name' },
+      question: 'The service looks for PAYMENTS_URL. What configuration did the Deployment actually give the v2.14.0 containers?',
+      playbook: 'What configuration is a container running with?',
+      command: 'kubectl rollout history deployment/pantry-api --revision=42',
+    },
+  ],
+  rootCauses: [
+    {
+      id: 'payments-down',
+      label: 'The payments service is down or rejecting requests.',
+      contradictedBy: [
+        {
+          finding: 'checkout-fails',
+          why: 'The error is Invalid URL with input "undefined/v1/charges". The request was never sent, so payments was never asked.',
+        },
+      ],
+    },
+    {
+      id: 'database-overloaded',
+      label: 'PostgreSQL is overloaded, so checkout queries fail.',
+      contradictedBy: [
+        {
+          finding: 'checkout-fails',
+          why: 'Checkout fails in 3 to 6 ms with a TypeError, not a database timeout, and other database-backed requests succeed.',
+        },
+      ],
+    },
+    {
+      id: 'url-code-mistake',
+      label: 'A coding mistake in v2.14.0 builds the payments URL wrongly.',
+      contradictedBy: [
+        {
+          finding: 'payments-url-missing',
+          why: 'The code builds the URL from PAYMENTS_URL as intended; the startup warning shows the value itself is missing.',
+        },
+        {
+          finding: 'manifest-old-name',
+          why: 'The Deployment never sets PAYMENTS_URL, so no code could have read a value from it.',
+        },
+      ],
+    },
+    {
+      id: 'renamed-config',
+      label: 'v2.14.0 reads PAYMENTS_URL, but the Deployment still sets the old name, PAYMENT_SERVICE_URL.',
+      correct: true,
+    },
+    {
+      id: 'bad-node',
+      label: 'One unhealthy node is breaking the pods scheduled on it.',
+      contradictedBy: [
+        {
+          finding: 'recent-rollout',
+          why: 'The three pods run on three different nodes, all Running and Ready, and every pod fails checkout the same way.',
+        },
+      ],
+    },
+  ],
+  mitigations: [
+    {
+      id: 'rollback',
+      label: 'Roll back pantry-api to v2.13.1',
+      verdict: 'best',
+      explanation:
+        'The last release that worked with the current configuration comes back in about a minute, and you do not need to understand the cause first. Capture the evidence, roll back, then investigate.',
+    },
+    {
+      id: 'set-env',
+      label: 'Add PAYMENTS_URL to the Deployment and let it roll out',
+      verdict: 'works',
+      explanation:
+        'Rolling forward. It is correct here, but only once you know the Root Cause, and a wrong guess under pressure costs another rollout while customers keep failing. Roll back first, then roll forward calmly.',
+    },
+    {
+      id: 'restart',
+      label: 'Restart the pantry-api pods',
+      verdict: 'no-effect',
+      explanation: 'New pods start with the same release and the same configuration, so checkouts keep failing.',
+    },
+    {
+      id: 'scale-up',
+      label: 'Scale pantry-api up to six replicas',
+      verdict: 'no-effect',
+      explanation: 'More copies of a broken release fail in the same way. Capacity was never the cause.',
+    },
+    {
+      id: 'delete',
+      label: 'Delete the Deployment and redeploy it from scratch',
+      verdict: 'harmful',
+      explanation:
+        'Every pod stops at once and the whole site goes down, not just checkout, until the Deployment is restored, which takes longer than a rollback.',
+    },
+  ],
+  postmortem: {
+    summary:
+      'Release v2.14.0 of pantry-api failed every checkout for 13 minutes. A configuration key was renamed in code but not in the Deployment manifest.',
+    impact:
+      'From 14:02 to 14:15 UTC every POST /api/checkout returned 500, about 9% of all requests. No customer could place an order. Browsing and carts were unaffected.',
+    timeline: [
+      { at: '14:02', event: 'CI rolls out v2.14.0 (revision 42). Health checks pass.' },
+      { at: '14:02', event: 'Checkout errors begin: TypeError Invalid URL, input "undefined/v1/charges".' },
+      { at: '14:09', event: 'PantryApiHighErrorRate fires after five minutes above 5%. On-call is paged.' },
+      { at: '14:12', event: 'On-call correlates the errors with the v2.14.0 rollout and saves the pod logs.' },
+      { at: '14:15', event: 'On-call rolls back to v2.13.1. Checkout errors stop within a minute.' },
+      { at: '14:19', event: 'The alert resolves.' },
+      { at: '14:40', event: 'The saved logs and revision 42 show the renamed key. Root Cause confirmed.' },
+    ],
+    rootCause:
+      'v2.14.0 renamed the payments address setting from PAYMENT_SERVICE_URL to PAYMENTS_URL. The Deployment manifest still set the old name, so the new code read undefined and built the URL "undefined/v1/charges". The health check does not touch payments, so the rollout looked healthy.',
+    resolution:
+      'Rolled back to v2.13.1 at 14:15. v2.14.0 will ship again with the manifest updated in the same change.',
+    actionItems: [
+      'Fail startup (and readiness) when a required configuration key is missing.',
+      'Change configuration keys in two steps: read both names for one release, then drop the old one.',
+      'Add a synthetic checkout to the canary step so a broken checkout stops the rollout.',
+      'Ship application logs to a central store so they outlive the pods.',
+    ],
+  },
+  prevention: [
+    'Validate configuration when the service starts and refuse to become ready without it. Kubernetes would then have kept v2.13.1 serving and the rollout would have stalled, with no customer impact.',
+    'Keep code and its manifest in one change, or read both the old and the new key for one release, so a rename cannot land half-done.',
+    'Make the rollout check what customers do. A health check that ignores payments passed while every checkout failed; a canary running a synthetic checkout would have caught it.',
+    'Send application logs to a central store. Here the evidence lived only inside the pods, which is why it had to be saved before the rollback.',
   ],
 })

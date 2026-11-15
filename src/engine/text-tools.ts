@@ -33,6 +33,9 @@ export function isTextTool(program: string): boolean {
   return program in operands
 }
 
+/** Every command that reads the Learner's saved files, for tab completion. */
+export const fileReadingCommands: readonly string[] = [...Object.keys(operands), 'ls']
+
 /** Split `grep -i warn api.log` into the filter stage `grep -i warn` and the file `api.log`, if any. */
 export function fileOperand(stage: string): { stage: string; file?: string } {
   const [program = '', ...args] = tokenize(stage)

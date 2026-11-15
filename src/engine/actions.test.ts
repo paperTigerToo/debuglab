@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { complete, dashboard, evidenceStatus, prompt, start, step } from './engine'
-import { dashboardFixture } from './fixtures'
+import { dashboardFixture, finishFixture } from './fixtures'
 import { defineIncident, type Line, type SessionState } from './types'
 
 const incident = defineIncident({
@@ -75,6 +75,7 @@ const incident = defineIncident({
     outage: dashboardFixture('firing', 'Every request is failing'),
   },
   expertPath: [],
+  ...finishFixture,
 })
 
 function session() {
@@ -197,21 +198,21 @@ describe('evidence', () => {
     const saved = s.type('kubectl logs deploy/api > api.log')
     expect(saved.display).toHaveLength(1)
     expect(s.state.findings).toEqual([])
-    expect(evidenceStatus(incident, s.state)).toEqual({ captured: ['api-logs'], lost: [] })
+    expect(evidenceStatus(s.state)).toEqual({ captured: ['api-logs'], lost: [] })
   })
 
   test('a Mitigation before capture destroys the evidence and says so', () => {
     const s = session()
     s.type('kubectl rollout undo deployment/api')
     expect(s.type('y').text).toContain('their logs with them')
-    expect(evidenceStatus(incident, s.state)).toEqual({ captured: [], lost: ['api-logs'] })
+    expect(evidenceStatus(s.state)).toEqual({ captured: [], lost: ['api-logs'] })
     expect(s.type('kubectl logs deploy/api').text).toContain('INFO all good')
   })
 
   test('captured evidence survives the Mitigation and can still be investigated', () => {
     const s = session()
     s.type('kubectl logs deploy/api > api.log', 'kubectl rollout undo deployment/api', 'y')
-    expect(evidenceStatus(incident, s.state)).toEqual({ captured: ['api-logs'], lost: [] })
+    expect(evidenceStatus(s.state)).toEqual({ captured: ['api-logs'], lost: [] })
     expect(s.type('grep ERROR api.log').display).toContainEqual({ kind: 'output', text: 'ERROR checkout failed' })
     expect(s.state.findings).toEqual(['throws'])
     expect(s.type('cat api.log').text).toContain('WARN PAYMENTS_URL not set')
@@ -221,13 +222,13 @@ describe('evidence', () => {
   test('saving output after the evidence is gone does not capture it', () => {
     const s = session()
     s.type('kubectl rollout undo deployment/api', 'y', 'kubectl logs deploy/api > late.log')
-    expect(evidenceStatus(incident, s.state)).toEqual({ captured: [], lost: ['api-logs'] })
+    expect(evidenceStatus(s.state)).toEqual({ captured: [], lost: ['api-logs'] })
   })
 
   test('tee shows the output and saves it', () => {
     const s = session()
     expect(s.type('kubectl logs deploy/api | tee api.log').text).toContain('ERROR checkout failed')
-    expect(evidenceStatus(incident, s.state).captured).toEqual(['api-logs'])
+    expect(evidenceStatus(s.state).captured).toEqual(['api-logs'])
   })
 
   test('ls lists saved files and reading a missing one fails like the real tool', () => {
@@ -250,5 +251,26 @@ describe('tab completion follows location', () => {
     s.type('kubectl logs deploy/api > api.log')
     expect(complete(incident, s.state, 'cat ap').text).toBe('cat api.log ')
     expect(complete(incident, s.state, 'kubectl logs api-').text).toBe('kubectl logs api-new-1 ')
+  })
+})
+
+describe('saving evidence', () => {
+  test('evidence counts as captured only when the whole output was saved', () => {
+    for (const partial of ['kubectl logs deploy/api --tail=1 > a.log', 'kubectl logs deploy/api | grep -c ERROR > a.log', 'kubectl logs deploy/api | grep ERROR > a.log']) {
+      const s = session()
+      s.type(partial)
+      expect(evidenceStatus(s.state).captured, partial).toEqual([])
+    }
+    const s = session()
+    s.type('kubectl logs deploy/api | tee whole.log | grep ERROR')
+    expect(evidenceStatus(s.state).captured).toEqual(['api-logs'])
+  })
+
+  test('saving a file inside a container is refused, because the file would vanish with the container', () => {
+    const s = session()
+    s.type('kubectl exec -it api-new-1 -- sh')
+    expect(s.type('env > env.txt').text).toContain('vanish')
+    s.type('exit')
+    expect(s.type('ls').display).toContainEqual({ kind: 'output', text: '' })
   })
 })

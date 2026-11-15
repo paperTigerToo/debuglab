@@ -15,11 +15,15 @@ One scripted failure of the Target System that the Learner works through from fi
 _Avoid_: Scenario, level, exercise, bug
 
 **Symptom**:
-Evidence the Learner is shown at the start of an Incident or uncovers during it: an alert, a graph, a log line or command output.
+Something the Learner is shown at the start of an Incident or uncovers during it: an alert, a graph, a log line or command output.
 _Avoid_: Clue, hint
 
+**Evidence**:
+Perishable output that shows why the Target System failed, such as the logs of pods a rollback will replace; it is captured by saving it before a Mitigation destroys it, or lost.
+_Avoid_: Proof, data, artifacts
+
 **Finding**:
-A key fact about an Incident that the Learner establishes by seeing its evidence, such as "the pods are twelve minutes old"; Findings mark investigation progress.
+A key fact about an Incident that the Learner establishes by seeing it in command output, such as "the pods are twelve minutes old"; Findings mark investigation progress.
 _Avoid_: Clue, discovery, milestone
 
 **Mitigation**:

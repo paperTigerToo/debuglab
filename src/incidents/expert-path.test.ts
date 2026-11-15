@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { evidenceStatus, start, step } from '../engine/engine'
+import { currentHint, evidenceStatus, start, step } from '../engine/engine'
 import type { IncidentDefinition, SessionState } from '../engine/types'
 import { incidents } from './index'
 
@@ -22,7 +22,7 @@ describe.each(incidents.map((i) => [i.title, i] as const))('%s', (_title, incide
       for (const finding of expert.reaches ?? []) expect(state.findings, expert.command).toContain(finding)
     }
     expect([...state.findings].sort()).toEqual(Object.keys(incident.findings).sort())
-    expect(evidenceStatus(incident, state).lost).toEqual([])
+    expect(evidenceStatus(state).lost).toEqual([])
     expect(incident.dashboard[state.namedState]?.alert.status).toBe('resolved')
   })
 
@@ -34,7 +34,7 @@ describe.each(incidents.map((i) => [i.title, i] as const))('%s', (_title, incide
       if (expert !== mitigation) state = type(incident, state, expert.command)
     }
     expect(incident.dashboard[state.namedState]?.alert.status).toBe('resolved')
-    expect(evidenceStatus(incident, state).lost).not.toEqual([])
+    expect(evidenceStatus(state).lost).not.toEqual([])
     expect(state.findings.length).toBeLessThan(Object.keys(incident.findings).length)
   })
 
@@ -44,5 +44,30 @@ describe.each(incidents.map((i) => [i.title, i] as const))('%s', (_title, incide
       const outputs = typeof command.output === 'string' ? [command.output] : Object.values(command.output)
       expect(outputs.length, command.match[0]).toBeGreaterThan(0)
     }
+  })
+})
+
+describe.each(incidents.map((i) => [i.title, i] as const))('%s finishing content', (_title, incident) => {
+  test('has exactly one correct Root Cause, and every wrong one says what rules it out', () => {
+    expect(incident.rootCauses.filter((c) => c.correct)).toHaveLength(1)
+    for (const cause of incident.rootCauses.filter((c) => !c.correct)) {
+      expect(cause.contradictedBy?.length, cause.id).toBeGreaterThan(0)
+    }
+  })
+
+  test('has a best Mitigation, and its Hints lead through the whole Expert Path', () => {
+    expect(incident.mitigations.some((m) => m.verdict === 'best')).toBe(true)
+    let state = start(incident)
+    for (const expert of incident.expertPath) state = type(incident, state, expert.command)
+    expect(currentHint(incident, state)).toBeUndefined()
+  })
+
+  test('every Hint goal is reachable by following that Hint\'s own command in order', () => {
+    let state = start(incident)
+    for (const hint of incident.hints) {
+      expect(currentHint(incident, state)?.index, hint.question).toBe(incident.hints.indexOf(hint))
+      state = type(incident, state, hint.command)
+    }
+    expect(currentHint(incident, state)).toBeUndefined()
   })
 })
