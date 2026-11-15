@@ -1,4 +1,5 @@
 import { useId, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { Annotated } from '../site/Term'
 
 type Props = {
   title: string
@@ -46,7 +47,9 @@ export function SignalChart({ title, unit, minutes, values, markers, floor, form
   return (
     <figure className="rounded-lg border border-line bg-panel p-3">
       <figcaption className="flex items-baseline justify-between gap-2">
-        <span className="text-xs font-medium text-muted">{title}</span>
+        <span className="text-xs font-medium text-muted">
+          <Annotated text={title} />
+        </span>
         <span className="font-mono text-sm tabular-nums">
           {format(values[shown] ?? latest)}
           <span className="ml-1 text-xs text-muted">{unit}</span>

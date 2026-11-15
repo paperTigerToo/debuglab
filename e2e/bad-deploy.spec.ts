@@ -97,8 +97,8 @@ test('a shell inside a container shows where you are and runs Linux tools', asyn
 test('the dashboard shows the golden signals, deploys and a filterable log', async ({ page }) => {
   await page.goto('lab/bad-deploy')
   const signals = page.getByRole('region', { name: 'Golden signals' })
-  for (const title of ['Request rate', 'Error rate (5xx)', 'Latency, 95th percentile', 'Saturation (API CPU of limit)']) {
-    await expect(signals.getByRole('figure', { name: new RegExp(title.replace(/[()]/g, '\\$&')) })).toBeVisible()
+  for (const title of [/Request rate/, /Error rate/, /Latency/, /Saturation/]) {
+    await expect(signals.getByRole('figure', { name: title })).toBeVisible()
   }
   await expect(signals.getByRole('img').first()).toHaveAccessibleName(/v2\.14\.0 at 14:02/)
 
@@ -201,7 +201,7 @@ test('Hints reveal three tiers and follow the investigation', async ({ page }) =
   await expect(hint).toContainText('Are the pods running, and since when?')
   await hint.getByRole('button', { name: 'Show the exact command' }).click()
   await expect(hint.getByRole('code')).toHaveText('kubectl get pods')
-  await expect(hint.getByRole('button')).toHaveCount(0)
+  await expect(hint.getByRole('button', { name: /^(Ask for|Show the)/ })).toHaveCount(0)
 
   await type(page, 'kubectl get pods')
   await expect(hint).not.toContainText('crashing, or new')

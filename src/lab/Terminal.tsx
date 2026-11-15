@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { complete, prompt, step } from '../engine/engine'
 import type { IncidentDefinition, Line, SessionState } from '../engine/types'
+import { Annotated } from '../site/Term'
 
 type Props = {
   incident: IncidentDefinition
@@ -75,6 +76,9 @@ export function Terminal({ incident, state, onState }: Props) {
     }
   }
 
+  // Each term is marked once across the whole log, not on every line it appears in.
+  const seen = new Set<string>()
+
   return (
     <section
       aria-label="Terminal"
@@ -94,10 +98,10 @@ export function Terminal({ incident, state, onState }: Props) {
           <div key={i} className={`whitespace-pre-wrap break-words ${lineStyle[line.kind]}`}>
             {line.kind === 'input' ? (
               <>
-                <span className="text-[#3ddc97]">{line.prompt}</span> {line.text}
+                <span className="text-[#3ddc97]">{line.prompt}</span> <Annotated text={line.text} seen={seen} />
               </>
             ) : (
-              line.text
+              <Annotated text={line.text} seen={seen} />
             )}
           </div>
         ))}

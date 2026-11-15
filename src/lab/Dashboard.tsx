@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AccessLogLine, Alert, Dashboard as DashboardData } from '../engine/types'
 import { SignalChart } from './SignalChart'
+import { Annotated } from '../site/Term'
 
 const whole = (n: number) => String(Math.round(n))
 const oneDecimal = (n: number) => (n < 10 ? n.toFixed(1) : String(Math.round(n)))
@@ -21,8 +22,11 @@ export function AlertPanel({ alert, status }: { alert: Alert; status: DashboardD
         <span className="font-mono text-sm font-semibold">{alert.name}</span>
         <span className="font-mono text-xs text-muted">since {alert.startedAt}</span>
       </div>
-      <p className="mt-2 text-sm">{status.summary}</p>
-      <p className="mt-1 font-mono text-xs text-muted">condition: {alert.condition}</p>
+      <p className="mt-2 text-sm">
+        <Annotated text={status.summary} />
+      </p>
+      <p className="mt-1 font-mono text-xs text-muted">condition: <Annotated text={alert.condition} />
+      </p>
     </section>
   )
 }
@@ -57,7 +61,9 @@ function DeployHistory({ deploys }: { deploys: DashboardData['deploys'] }) {
             <span className={i === 0 ? 'font-semibold text-text' : 'text-text'}>{d.version}</span>
             {i === 0 && <span className="rounded bg-panel-2 px-1.5 text-[10px] uppercase text-muted">live</span>}
             <span className="text-muted">{d.at}</span>
-            <span className="ml-auto text-muted">{d.by}</span>
+            <span className="ml-auto text-muted">
+              <Annotated text={d.by} />
+            </span>
           </li>
         ))}
       </ol>
@@ -113,7 +119,9 @@ function LogView({ logs }: { logs: readonly AccessLogLine[] }) {
               <th className="py-1 pr-3 font-normal">request</th>
               <th className="py-1 pr-3 font-normal">status</th>
               <th className="py-1 pr-3 text-right font-normal">ms</th>
-              <th className="py-1 font-normal">upstream</th>
+              <th className="py-1 font-normal">
+                <Annotated text="upstream" />
+              </th>
             </tr>
           </thead>
           <tbody>

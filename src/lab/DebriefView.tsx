@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Debrief } from '../engine/engine'
+import { Annotated } from '../site/Term'
 
 const verdictText = {
   best: 'The right first move',
@@ -44,14 +45,16 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
         <Verdict good={harm.stopped} title={harm.stopped ? 'You stopped the harm' : 'Customers were still affected'}>
           <p>
             <span className="text-muted">What your commands did. </span>
-            When you finished: {harm.summary}
+            When you finished: <Annotated text={harm.summary} />
           </p>
           <div className="border-t border-line pt-2">
             <p>
               <span className="text-muted">The Mitigation you said you would apply. </span>
               <strong>{harm.mitigation.label}</strong>: {verdictText[harm.mitigation.verdict]}.
             </p>
-            <p className="text-muted">{harm.mitigation.explanation}</p>
+            <p className="text-muted">
+              <Annotated text={harm.mitigation.explanation} />
+            </p>
           </div>
         </Verdict>
         <Verdict good={rootCause.correct} title={rootCause.correct ? 'You found the Root Cause' : 'That is not the Root Cause'}>
@@ -66,7 +69,7 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
               <ul className="space-y-2">
                 {rootCause.contradictions.map((c) => (
                   <li key={c.why} className="border-l-2 border-line pl-3">
-                    {c.why}{' '}
+                    <Annotated text={c.why} />{' '}
                     <span className="text-muted">
                       {c.reached ? `You had reached this Finding: ${c.finding}` : `A Finding you never reached: ${c.finding}`}
                     </span>
@@ -97,8 +100,12 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
                 <span aria-label={s.covered ? 'covered' : 'missed'} className={s.covered ? 'text-accent' : 'text-danger'}>
                   {s.covered ? '✓' : '○'}
                 </span>{' '}
-                <code className="font-mono text-xs">{s.command}</code>
-                <span className="block pl-4 text-xs text-muted">{s.why}</span>
+                <code className="font-mono text-xs">
+                  <Annotated text={s.command} />
+                </code>
+                <span className="block pl-4 text-xs text-muted">
+                  <Annotated text={s.why} />
+                </span>
               </li>
             ))}
           </ol>
@@ -165,7 +172,7 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
           </table>
           <p>
             <span className="text-muted">Root Cause. </span>
-            {d.postmortem.rootCause}
+            <Annotated text={d.postmortem.rootCause} />
           </p>
           <p>
             <span className="text-muted">Resolution. </span>
@@ -185,7 +192,9 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
       <Section title="How this could have been prevented">
         <ul className="list-disc space-y-2 pl-5">
           {d.prevention.map((p) => (
-            <li key={p}>{p}</li>
+            <li key={p}>
+              <Annotated text={p} />
+            </li>
           ))}
         </ul>
       </Section>

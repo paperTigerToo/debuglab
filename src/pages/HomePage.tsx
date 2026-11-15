@@ -1,5 +1,9 @@
 import { Link } from 'react-router'
 import { areas } from '../site/areas'
+import { Annotated } from '../site/Term'
+
+const intro =
+  'DebugLab teaches how to find out why a running web service is failing, not only how to undo the last change. Read the broad ideas, look up the exact commands, then work a simulated Incident from the alert that pages you to its Root Cause. The rule underneath everything: stop the harm first, and capture the evidence before your Mitigation destroys it.'
 
 export function HomePage() {
   return (
@@ -10,10 +14,7 @@ export function HomePage() {
           Learn to debug a live service before you are paged for one.
         </h1>
         <p className="text-muted">
-          DebugLab teaches how to find out why a running web service is failing, not only how to undo the last
-          change. Read the broad ideas, look up the exact commands, then work a simulated Incident from the alert that
-          pages you to its Root Cause. The rule underneath everything: stop the harm first, and capture the
-          evidence before your Mitigation destroys it.
+          <Annotated text={intro} />
         </p>
       </section>
       <section aria-labelledby="areas-heading">

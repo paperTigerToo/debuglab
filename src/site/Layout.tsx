@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router'
 import { areas } from './areas'
+import { TermDescriptions } from './Term'
 import { useTheme } from './theme'
 
 export function Layout() {
@@ -43,6 +44,7 @@ export function Layout() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <Outlet />
       </main>
+      <TermDescriptions />
       <footer className="border-t border-line px-4 py-4 text-center text-xs text-muted">
         DebugLab: practise debugging a live service without a live service.
       </footer>

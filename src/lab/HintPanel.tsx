@@ -1,4 +1,5 @@
 import type { HintView } from '../engine/engine'
+import { Annotated } from '../site/Term'
 
 const tierNames = ['Ask for a Hint', 'Show the Playbook Entry', 'Show the exact command']
 
@@ -17,20 +18,26 @@ export function HintPanel({ hint, onReveal }: { hint: HintView | undefined; onRe
             {hint.question && (
               <div>
                 <dt className="sr-only">Question</dt>
-                <dd>{hint.question}</dd>
+                <dd>
+                  <Annotated text={hint.question} />
+                </dd>
               </div>
             )}
             {hint.playbook && (
               <div>
                 <dt className="font-mono text-xs text-muted">Playbook Entry</dt>
-                <dd className="italic">{hint.playbook}</dd>
+                <dd className="italic">
+                  <Annotated text={hint.playbook} />
+                </dd>
               </div>
             )}
             {hint.command && (
               <div>
                 <dt className="font-mono text-xs text-muted">Command</dt>
                 <dd>
-                  <code className="block overflow-x-auto rounded bg-bg px-2 py-1 font-mono text-xs">{hint.command}</code>
+                  <code className="block overflow-x-auto rounded bg-bg px-2 py-1 font-mono text-xs">
+                    <Annotated text={hint.command} />
+                  </code>
                 </dd>
               </div>
             )}

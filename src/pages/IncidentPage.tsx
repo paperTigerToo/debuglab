@@ -10,6 +10,7 @@ import { HintPanel } from '../lab/HintPanel'
 import { Terminal } from '../lab/Terminal'
 import { useProgress } from '../site/progress'
 import { NotFoundPage } from './NotFoundPage'
+import { Annotated } from '../site/Term'
 
 export function IncidentPage() {
   const { incidentId = '' } = useParams()
@@ -68,7 +69,9 @@ function IncidentWorkspace({ incident }: { incident: IncidentDefinition }) {
     <div className="space-y-6">
       {heading}
       <AlertPanel alert={incident.alert} status={data.alert} />
-      <p className="max-w-3xl text-sm text-muted">{incident.briefing}</p>
+      <p className="max-w-3xl text-sm text-muted">
+        <Annotated text={incident.briefing} />
+      </p>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <Dashboard data={data} />
@@ -134,7 +137,7 @@ function Progress({ incident, state }: { incident: IncidentDefinition; state: Se
           <ol className="mt-3 space-y-3 text-sm">
             {state.findings.map((id) => (
               <li key={id} className="border-l-2 border-accent pl-3">
-                {incident.findings[id]?.summary}
+                <Annotated text={incident.findings[id]?.summary ?? ''} />
               </li>
             ))}
           </ol>

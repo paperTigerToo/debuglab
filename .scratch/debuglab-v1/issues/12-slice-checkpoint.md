@@ -16,3 +16,4 @@
   - Scaling pantry-api to zero and deleting the Deployment share one "outage" state; after scaling, real kubectl would still list the Deployment at 0/0.
   - All three v2.14.0 pods print identical logs.
   - Evidence is captured by saving output to a file (> FILE, | tee FILE). There is no separate capture button yet.
+- From ticket 08: consider splitting the term list by owner (glossary words, reference, per-Incident terms), and whether bare numbers such as 500 should be marked as status codes.
