@@ -4,11 +4,15 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Home page explains the site and links to the four areas
-- [ ] Navigation between the four areas is visible on every page and marks the current one
-- [ ] Dark theme by default, light theme toggle, choice remembered across reloads, site still works when storage is unavailable
-- [ ] Each area has its own address; loading it directly or refreshing it shows the right page under the project sub-path
-- [ ] Unit test runner and browser test runner are set up, each with passing tests
-- [ ] A GitHub Actions workflow runs typecheck, unit tests, build and browser tests on push and pull request
+- [x] Home page explains the site and links to the four areas
+- [x] Navigation between the four areas is visible on every page and marks the current one
+- [x] Dark theme by default, light theme toggle, choice remembered across reloads, site still works when storage is unavailable
+- [x] Each area has its own address; loading it directly or refreshing it shows the right page under the project sub-path
+- [x] Unit test runner and browser test runner are set up, each with passing tests
+- [x] A GitHub Actions workflow runs typecheck, unit tests, build and browser tests on push and pull request
+
+## Comments
+
+- Done. React Router with a `/DebugLab/` base; the build copies `index.html` to `404.html` so deep links and refreshes work on GitHub Pages. Browser tests run against a local server that mimics Pages (missing paths get `404.html`). CI runs typecheck, unit tests, build and browser tests; deploying is ticket 02.

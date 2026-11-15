@@ -18,6 +18,10 @@ _Avoid_: Scenario, level, exercise, bug
 Evidence the Learner is shown at the start of an Incident or uncovers during it: an alert, a graph, a log line or command output.
 _Avoid_: Clue, hint
 
+**Finding**:
+A key fact about an Incident that the Learner establishes by seeing its evidence, such as "the pods are twelve minutes old"; Findings mark investigation progress.
+_Avoid_: Clue, discovery, milestone
+
 **Mitigation**:
 An action that stops user harm without explaining the failure, such as a rollback or turning a feature flag off.
 _Avoid_: Fix, workaround

@@ -13,3 +13,8 @@
 - [ ] Harmful action shows a bad consequence
 - [ ] Restart returns the Incident to its start
 - [ ] Engine tests for location, confirmation, transitions and evidence loss; a "mitigate immediately" replay loses evidence
+
+## Comments
+
+- From the review of tickets 01 and 03: the normaliser knows kubectl flags per program, not per subcommand. `-f` always means `--follow` and `-p` always `--previous`, so `kubectl apply -f x.yaml` and `kubectl patch -p '{...}'` normalise wrongly, and an unknown valued flag such as `--replicas 0` splits into a bare flag and a stray positional. Make flags per subcommand before scripting mutating commands.
+- The command schema has no location key and no read-only/mutating mark yet; the spec asks for both ("command table per state and location"; "Commands are marked read-only or mutating"). Add them here.

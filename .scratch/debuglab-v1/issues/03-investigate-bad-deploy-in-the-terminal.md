@@ -4,14 +4,18 @@
 
 **Blocked by:** 01 Walking skeleton
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Incident engine is a pure module: (Incident definition, session state, input) to (new state, display)
-- [ ] Bad Deploy is one typed data file read by the engine
-- [ ] Command normalisation accepts whitespace, flag-order and short/long flag variations
-- [ ] "Not simulated here" reply for known-but-unscripted commands; typo suggestion for unknown ones
-- [ ] Tab completion of commands and resource names; up/down history
-- [ ] Key findings are recorded when the Learner reaches them
-- [ ] Engine tests cover normalisation, both failure replies and finding progress
-- [ ] Expert Path replay test reaches every key finding for Bad Deploy
-- [ ] Browser test types the Expert Path's read-only commands and sees the expected output
+- [x] Incident engine is a pure module: (Incident definition, session state, input) to (new state, display)
+- [x] Bad Deploy is one typed data file read by the engine
+- [x] Command normalisation accepts whitespace, flag-order and short/long flag variations
+- [x] "Not simulated here" reply for known-but-unscripted commands; typo suggestion for unknown ones
+- [x] Tab completion of commands and resource names; up/down history
+- [x] Key findings are recorded when the Learner reaches them
+- [x] Engine tests cover normalisation, both failure replies and finding progress
+- [x] Expert Path replay test reaches every key finding for Bad Deploy
+- [x] Browser test types the Expert Path's read-only commands and sees the expected output
+
+## Comments
+
+- Done. Beyond the ticket: pipes into `grep` (with -i -v -c -E), `head`, `tail` and `wc -l`; any `kubectl logs --tail N`; `help` and `clear`; a Findings panel. A Finding can require its evidence to be on screen (`seenIn`), so `--tail` or a pipe that hides it does not count. Typos in kube resource types and pod names get kubectl's own errors.

@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0f14;
+  --panel: #111821;
+  --panel-2: #16202b;
+  --line: #223041;
+  --text: #d8e1eb;
+  --muted: #8797aa;
+  --accent: #3ddc97;
+  --warn: #f5b84a;
+  --danger: #ff5d6c;
+  --info: #5cc8ff;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f7fa;
+  --panel: #ffffff;
+  --panel-2: #eef2f6;
+  --line: #d5dde6;
+  --text: #17202a;
+  --muted: #566476;
+  --accent: #0b8457;
+  --warn: #9a6200;
+  --danger: #c62837;
+  --info: #0a6fa8;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
