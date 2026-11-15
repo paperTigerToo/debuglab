@@ -1,4 +1,6 @@
+import { motion, useReducedMotion } from 'motion/react'
 import { useId, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { CHART_DRAW_S, CHART_RESHAPE_S } from '../site/motion'
 import { Annotated } from '../site/Term'
 
 type Props = {
@@ -20,6 +22,7 @@ const PAD = { top: 18, right: 8, bottom: 20, left: 34 }
 export function SignalChart({ title, unit, minutes, values, markers, floor, format }: Props) {
   const [hover, setHover] = useState<number | null>(null)
   const id = useId()
+  const reduceMotion = useReducedMotion()
   const max = Math.max(floor, ...values) * 1.15
   const plotW = W - PAD.left - PAD.right
   const plotH = H - PAD.top - PAD.bottom
@@ -101,7 +104,17 @@ export function SignalChart({ title, unit, minutes, values, markers, floor, form
             </text>
           </g>
         ))}
-        <path d={path} fill="none" className="stroke-series" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        {/* The line draws in when the dashboard opens, and moves to its new shape when the Target System changes. */}
+        <motion.path
+          fill="none"
+          className="stroke-series"
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          initial={reduceMotion ? false : { pathLength: 0, d: path }}
+          animate={{ pathLength: 1, d: path }}
+          transition={reduceMotion ? { duration: 0 } : { pathLength: { duration: CHART_DRAW_S, ease: 'easeOut' }, d: { duration: CHART_RESHAPE_S, ease: 'easeInOut' } }}
+        />
         {hover !== null && (
           <g pointerEvents="none">
             <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + plotH} className="stroke-text/50" strokeWidth={1} />

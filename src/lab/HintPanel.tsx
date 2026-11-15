@@ -19,7 +19,7 @@ export function HintPanel({ hint, onReveal }: { hint: HintView | undefined; onRe
         <>
           <dl className="mt-3 space-y-2 text-sm" aria-live="polite">
             {hint.question && (
-              <div>
+              <div className="animate-rise">
                 <dt className="sr-only">Question</dt>
                 <dd>
                   <Annotated text={hint.question} />
@@ -27,7 +27,7 @@ export function HintPanel({ hint, onReveal }: { hint: HintView | undefined; onRe
               </div>
             )}
             {hint.playbook && (
-              <div>
+              <div className="animate-rise">
                 <dt className="font-mono text-xs text-muted">Playbook Entry</dt>
                 <dd>
                   <Link to={playbookPath(hint.playbook)} target="_blank" className="text-accent underline decoration-accent/40 underline-offset-[3px] hover:decoration-accent">
@@ -38,7 +38,7 @@ export function HintPanel({ hint, onReveal }: { hint: HintView | undefined; onRe
               </div>
             )}
             {hint.command && (
-              <div>
+              <div className="animate-rise">
                 <dt className="font-mono text-xs text-muted">Command</dt>
                 <dd>
                   <code className="block overflow-x-auto rounded bg-bg px-2 py-1 font-mono text-xs">

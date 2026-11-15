@@ -1,11 +1,15 @@
-import { Link, NavLink, Outlet } from 'react-router'
+import { motion, useReducedMotion } from 'motion/react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { areas } from './areas'
+import { PAGE_ENTER_S } from './motion'
 import { TermDescriptions } from './Term'
 import { useTheme } from './theme'
 
 export function Layout() {
   const { theme, toggle } = useTheme()
   const next = theme === 'dark' ? 'light' : 'dark'
+  const { pathname } = useLocation()
+  const reduceMotion = useReducedMotion()
   return (
     <div className="min-h-dvh flex flex-col">
       <header className="sticky top-0 z-10 border-b border-line bg-bg/90 backdrop-blur">
@@ -42,7 +46,15 @@ export function Layout() {
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-        <Outlet />
+        {/* Each page settles in briefly, so a change of page reads as one. */}
+        <motion.div
+          key={pathname}
+          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: PAGE_ENTER_S, ease: 'easeOut' }}
+        >
+          <Outlet />
+        </motion.div>
       </main>
       <TermDescriptions />
       <footer className="border-t border-line px-4 py-4 text-center text-xs text-muted">

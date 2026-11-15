@@ -15,7 +15,7 @@ export function AlertPanel({ alert, status }: { alert: Alert; status: DashboardD
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span
-          className={`rounded px-2 py-0.5 font-mono text-xs font-semibold uppercase text-bg ${firing ? 'bg-danger' : 'bg-accent'}`}
+          className={`rounded px-2 py-0.5 font-mono text-xs font-semibold uppercase text-bg ${firing ? 'animate-alert-pulse bg-danger' : 'bg-accent'}`}
         >
           {firing ? '● firing' : '✓ resolved'}
         </span>

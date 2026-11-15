@@ -18,4 +18,5 @@
   - Evidence is captured by saving output to a file (> FILE, | tee FILE). There is no separate capture button yet.
 - From ticket 08: consider splitting the term list by owner (glossary words, reference, per-Incident terms), and whether bare numbers such as 500 should be marked as status codes.
 - From ticket 10: worth asking the Learner whether the Playbook's sample output should carry tooltips like the terminal does, and whether opening a Playbook Entry from a Hint in a new tab suits them.
+- From ticket 11: ask whether the animations feel quick enough, the alert pulse in particular, and whether a phone Learner wants "Open it anyway" remembered.
 

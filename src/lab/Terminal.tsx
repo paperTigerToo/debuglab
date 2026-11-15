@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { complete, prompt, step } from '../engine/engine'
 import type { IncidentDefinition, Line, SessionState } from '../engine/types'
+import { STREAM_MAX_MS, STREAM_STEP_MS } from '../site/motion'
 import { Annotated } from '../site/Term'
 
 type Props = {
@@ -101,7 +102,12 @@ export function Terminal({ incident, state, onState }: Props) {
                 <span className="text-[#3ddc97]">{line.prompt}</span> <Annotated text={line.text} seen={seen} />
               </>
             ) : (
-              <Annotated text={line.text} seen={seen} />
+              // Output streams in a line at a time, fast enough not to keep you waiting.
+              line.text.split('\n').map((text, j) => (
+                <span key={j} className="block animate-stream" style={{ animationDelay: `${Math.min(j * STREAM_STEP_MS, STREAM_MAX_MS)}ms` }}>
+                  {text ? <Annotated text={text} seen={seen} /> : ' '}
+                </span>
+              ))
             )}
           </div>
         ))}

@@ -9,6 +9,7 @@ import { FinishForm } from '../lab/FinishForm'
 import { HintPanel } from '../lab/HintPanel'
 import { Terminal } from '../lab/Terminal'
 import { useProgress } from '../site/progress'
+import { useMediaQuery } from '../site/useMediaQuery'
 import { NotFoundPage } from './NotFoundPage'
 import { Annotated } from '../site/Term'
 
@@ -19,12 +20,21 @@ export function IncidentPage() {
   return <IncidentWorkspace key={incident.id} incident={incident} />
 }
 
+/**
+ * Screens the Incident Lab works on: wide enough for the dashboard beside the terminal, with a mouse.
+ * A mouse stands in for a keyboard, which no media query can detect.
+ */
+const LAB_MEDIA_QUERY = '(min-width: 768px) and (hover: hover) and (pointer: fine)'
+
 function IncidentWorkspace({ incident }: { incident: IncidentDefinition }) {
   const [state, setState] = useState(() => start(incident))
   // Changing the run remounts the terminal, clearing its scrollback and history.
   const [run, setRun] = useState(0)
   const { record } = useProgress()
   const data = dashboard(incident, state)
+  // The terminal needs a physical keyboard and room beside the dashboard.
+  const fitsDevice = useMediaQuery(LAB_MEDIA_QUERY)
+  const [openAnyway, setOpenAnyway] = useState(false)
 
   function restart() {
     setState(start(incident))
@@ -73,19 +83,48 @@ function IncidentWorkspace({ incident }: { incident: IncidentDefinition }) {
         <Annotated text={incident.briefing} />
       </p>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        <Dashboard data={data} />
-        <div className="space-y-4">
-          <Terminal key={run} incident={incident} state={state} onState={setState} />
-          <HintPanel
-            hint={currentHint(incident, state)}
-            onReveal={() => setState((s) => step(incident, s, { kind: 'hint' }).state)}
-          />
-          <Progress incident={incident} state={state} />
-          <FinishForm incident={incident} onFinish={finish} />
+      {!fitsDevice && !openAnyway ? (
+        <SmallScreenNotice onOpen={() => setOpenAnyway(true)} />
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+          <Dashboard data={data} />
+          <div className="space-y-4">
+            <Terminal key={run} incident={incident} state={state} onState={setState} />
+            <HintPanel
+              hint={currentHint(incident, state)}
+              onReveal={() => setState((s) => step(incident, s, { kind: 'hint' }).state)}
+            />
+            <Progress incident={incident} state={state} />
+            <FinishForm incident={incident} onFinish={finish} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
+  )
+}
+
+function SmallScreenNotice({ onOpen }: { onOpen: () => void }) {
+  return (
+    <section aria-labelledby="small-screen-heading" className="max-w-xl rounded-lg border border-warn/50 bg-warn/10 p-4 text-sm">
+      <h2 id="small-screen-heading" className="font-medium">
+        Best on a computer
+      </h2>
+      <p className="mt-2 text-muted">
+        The Incident Lab is worked by typing commands into a terminal beside a dashboard. It needs a keyboard and a
+        larger screen than this one. Meanwhile, the reading areas work well here.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link to="/concepts" className="rounded bg-accent px-3 py-1.5 font-medium text-bg">
+          Read the Concepts
+        </Link>
+        <Link to="/playbook" className="rounded border border-line px-3 py-1.5 text-muted hover:text-text">
+          Browse the Playbook
+        </Link>
+        <button type="button" onClick={onOpen} className="rounded border border-line px-3 py-1.5 text-muted hover:text-text">
+          Open it anyway
+        </button>
+      </div>
+    </section>
   )
 }
 

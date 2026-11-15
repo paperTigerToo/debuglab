@@ -34,7 +34,7 @@ function Verdict({ good, title, children }: { good: boolean; title: string; chil
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section aria-label={title} className="rounded-lg border border-line bg-panel p-4">
+    <section aria-label={title} className="animate-rise rounded-lg border border-line bg-panel p-4">
       <h2 className="font-mono text-xs uppercase tracking-widest text-muted">{title}</h2>
       <div className="mt-3 text-sm">{children}</div>
     </section>
