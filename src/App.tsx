@@ -4,6 +4,7 @@ import { HomePage } from './pages/HomePage'
 import { ConceptsPage } from './pages/ConceptsPage'
 import { ConceptPage } from './pages/ConceptPage'
 import { PlaybookPage } from './pages/PlaybookPage'
+import { PlaybookEntryPage } from './pages/PlaybookEntryPage'
 import { IncidentLabPage } from './pages/IncidentLabPage'
 import { IncidentPage } from './pages/IncidentPage'
 import { ResourcesPage } from './pages/ResourcesPage'
@@ -17,6 +18,7 @@ export function App() {
         <Route path="concepts" element={<ConceptsPage />} />
         <Route path="concepts/:conceptId" element={<ConceptPage />} />
         <Route path="playbook" element={<PlaybookPage />} />
+        <Route path="playbook/:entryId" element={<PlaybookEntryPage />} />
         <Route path="lab" element={<IncidentLabPage />} />
         <Route path="lab/:incidentId" element={<IncidentPage />} />
         <Route path="resources" element={<ResourcesPage />} />

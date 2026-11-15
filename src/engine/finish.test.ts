@@ -44,17 +44,17 @@ const incident = defineIncident({
     { command: 'kubectl describe deployment api', why: 'Check config', reaches: ['config'] },
   ],
   hints: [
-    { goal: { finding: 'young' }, question: 'Are the pods new?', playbook: 'Are the pods running?', command: 'kubectl get pods' },
+    { goal: { finding: 'young' }, question: 'Are the pods new?', playbook: 'pods-running', command: 'kubectl get pods' },
     {
       goal: { finding: 'throws' },
       needs: { evidence: 'logs' },
       question: 'What errors?',
-      playbook: 'What is the application logging?',
+      playbook: 'app-logging',
       command: 'kubectl logs deployment/api',
     },
-    { goal: { captured: 'logs' }, question: 'Will the logs survive?', playbook: 'How do I keep evidence?', command: 'kubectl logs deployment/api > api.log' },
-    { goal: { state: 'mitigated' }, question: 'How do you stop the harm?', playbook: 'How do I roll back?', command: 'kubectl rollout undo deployment/api' },
-    { goal: { finding: 'config' }, question: 'What config does it get?', playbook: 'What config is running?', command: 'kubectl describe deployment api' },
+    { goal: { captured: 'logs' }, question: 'Will the logs survive?', playbook: 'keep-evidence', command: 'kubectl logs deployment/api > api.log' },
+    { goal: { state: 'mitigated' }, question: 'How do you stop the harm?', playbook: 'roll-back', command: 'kubectl rollout undo deployment/api' },
+    { goal: { finding: 'config' }, question: 'What config does it get?', playbook: 'config-running', command: 'kubectl describe deployment api' },
   ],
   rootCauses: [
     { id: 'renamed-key', label: 'The release renamed a config key the manifest still uses', correct: true },
@@ -103,9 +103,9 @@ describe('Hints', () => {
       index: 0,
       tier: 2,
       question: 'Are the pods new?',
-      playbook: 'Are the pods running?',
+      playbook: 'pods-running',
     })
-    const all = { index: 0, tier: 3, question: 'Are the pods new?', playbook: 'Are the pods running?', command: 'kubectl get pods' }
+    const all = { index: 0, tier: 3, question: 'Are the pods new?', playbook: 'pods-running', command: 'kubectl get pods' }
     expect(currentHint(incident, play(hint, hint, hint))).toEqual(all)
     expect(currentHint(incident, play(hint, hint, hint, hint))).toEqual(all)
   })
@@ -202,6 +202,17 @@ describe('the Debrief', () => {
     expect(d.postmortem.summary).toBe('Checkout failed for 13 minutes.')
     expect(d.prevention).toEqual(['Validate configuration at startup.'])
     expect(d.links).toEqual({ concepts: ['mitigate-then-investigate'], resources: ['k8s-logging'] })
+  })
+
+  test('lists the Playbook Entries the Hints name, marking those the Learner needed a Hint for', () => {
+    const d = debrief(incident, play(hint, finish('renamed-key', 'rollback')))
+    expect(d.playbookEntries).toEqual([
+      { id: 'pods-running', hinted: true },
+      { id: 'app-logging', hinted: false },
+      { id: 'keep-evidence', hinted: false },
+      { id: 'roll-back', hinted: false },
+      { id: 'config-running', hinted: false },
+    ])
   })
 })
 

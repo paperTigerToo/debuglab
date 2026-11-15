@@ -119,7 +119,7 @@ export type Hint<S extends string, F extends string, E extends string> = {
   /** Skip this Hint when the evidence it relies on was lost. */
   needs?: { evidence: E }
   question: string
-  /** The Playbook Entry that answers the question, by its question. */
+  /** The Playbook Entry that answers the question, by its identifier. */
   playbook: string
   command: string
 }

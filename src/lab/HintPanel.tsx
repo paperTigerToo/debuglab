@@ -1,4 +1,7 @@
+import { Link } from 'react-router'
+import { entryById } from '../content/playbook'
 import type { HintView } from '../engine/engine'
+import { playbookPath } from '../site/paths'
 import { Annotated } from '../site/Term'
 
 const tierNames = ['Ask for a Hint', 'Show the Playbook Entry', 'Show the exact command']
@@ -26,8 +29,11 @@ export function HintPanel({ hint, onReveal }: { hint: HintView | undefined; onRe
             {hint.playbook && (
               <div>
                 <dt className="font-mono text-xs text-muted">Playbook Entry</dt>
-                <dd className="italic">
-                  <Annotated text={hint.playbook} />
+                <dd>
+                  <Link to={playbookPath(hint.playbook)} target="_blank" className="text-accent underline decoration-accent/40 underline-offset-[3px] hover:decoration-accent">
+                    {entryById(hint.playbook)?.question ?? hint.playbook}
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </Link>
                 </dd>
               </div>
             )}

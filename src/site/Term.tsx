@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { annotate } from '../content/annotate'
 import { conceptById } from '../content/concepts'
+import { entryById } from '../content/playbook'
 import { terms, type Term } from '../content/terms'
-import { conceptPath } from './paths'
+import { conceptPath, playbookPath } from './paths'
 
 const WIDTH = 288
 const GAP = 6
@@ -22,12 +23,24 @@ function positionBeside(trigger: HTMLElement): Position {
     : { left, top: rect.bottom + GAP }
 }
 
-const conceptOf = (term: Term) => (term.concept ? conceptById(term.concept) : undefined)
+type DeeperPage = { label: string; name: string; path: string }
+
+/** The fuller page a term's tooltip links to: its Concept or its Playbook Entry, if it has one. */
+function deeperOf(term: Term): DeeperPage | undefined {
+  const concept = term.concept ? conceptById(term.concept) : undefined
+  if (concept) return { label: 'Concept', name: concept.title, path: conceptPath(concept.id) }
+  const entry = term.playbook ? entryById(term.playbook) : undefined
+  if (entry) return { label: 'Playbook Entry', name: entry.question, path: playbookPath(entry.id) }
+  return undefined
+}
+
+/** Ends a title as a sentence, unless it is already a question. */
+const sentence = (title: string) => (/[?.]$/.test(title) ? title : `${title}.`)
 
 /**
  * A term with its explanation. Hovering or focusing shows it; clicking or tapping keeps it open
  * until clicked again, Escape, or a click elsewhere. Screen readers hear it as the term's description.
- * When the term has a Concept, the tooltip links to it: the pointer can move into the tooltip, and
+ * When the term has a Concept or Playbook Entry, the tooltip links to it: the pointer can move into the tooltip, and
  * pressing Enter on the term moves keyboard focus to the link.
  */
 export function TermTip({ term, children }: { term: Term; children: string }) {
@@ -39,7 +52,7 @@ export function TermTip({ term, children }: { term: Term; children: string }) {
   const popup = useRef<HTMLDivElement>(null)
   const link = useRef<HTMLAnchorElement>(null)
   const leaveTimer = useRef<number>(undefined)
-  const concept = conceptOf(term)
+  const deeper = deeperOf(term)
   const open = hovered || pinned
 
   function close() {
@@ -105,7 +118,7 @@ export function TermTip({ term, children }: { term: Term; children: string }) {
     if (pinned) return close()
     setPinned(true)
     // Enter or Space (a click with no pointer) takes keyboard users into the tooltip's link.
-    if (event.detail === 0 && concept) setLinkFocusPending(true)
+    if (event.detail === 0 && deeper) setLinkFocusPending(true)
   }
 
   // The tooltip sits at the end of the page, so Tab from its link returns to the term and moves on from there.
@@ -146,15 +159,15 @@ export function TermTip({ term, children }: { term: Term; children: string }) {
               <span className="mb-1 block font-mono text-xs text-muted">{children}</span>
               {term.explanation}
             </div>
-            {concept && (
+            {deeper && (
               <Link
                 ref={link}
-                to={conceptPath(concept.id)}
+                to={deeper.path}
                 onClick={close}
                 onKeyDown={onLinkKeyDown}
                 className="mt-2 block text-xs text-accent hover:underline"
               >
-                Read the Concept: {concept.title} →
+                Read the {deeper.label}: {deeper.name} →
               </Link>
             )}
           </div>,
@@ -174,11 +187,11 @@ export function TermDescriptions() {
   return (
     <div hidden>
       {terms.map((term) => {
-        const concept = conceptOf(term)
+        const deeper = deeperOf(term)
         return (
           <span key={term.id} id={descriptionId(term)}>
             {term.explanation}
-            {concept && ` More in the Concept: ${concept.title}. Press Enter to reach the link.`}
+            {deeper && ` More in the ${deeper.label}: ${sentence(deeper.name)} Press Enter to reach the link.`}
           </span>
         )
       })}

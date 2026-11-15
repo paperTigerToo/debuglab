@@ -1,10 +1,10 @@
 // Content prose with links written inline as [text](kind:id), so a Concept can cite a Resource,
 // another Concept or an Incident in the middle of a sentence. The integrity test resolves every one.
 
-export type ContentLink = { kind: 'concept' | 'resource' | 'incident'; id: string }
+export type ContentLink = { kind: 'concept' | 'playbook' | 'resource' | 'incident'; id: string }
 export type ProsePart = string | { text: string; to: ContentLink }
 
-const link = /\[([^\]]+)\]\((concept|resource|incident):([a-z0-9-]+)\)/g
+const link = /\[([^\]]+)\]\((concept|playbook|resource|incident):([a-z0-9-]+)\)/g
 
 export function parseProse(text: string): ProsePart[] {
   const parts: ProsePart[] = []

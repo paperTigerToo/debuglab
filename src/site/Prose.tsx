@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { parseProse } from '../content/prose'
 import { resourceById } from '../content/resources'
-import { conceptPath, incidentPath } from './paths'
+import { sitePaths } from './paths'
 import { Annotated } from './Term'
 
 const linkStyle = 'text-accent underline decoration-accent/40 underline-offset-[3px] hover:decoration-accent'
@@ -32,7 +32,7 @@ export function Prose({ text }: { text: string }) {
             {part.text}
           </Cite>
         ) : (
-          <Link key={i} to={(part.to.kind === 'concept' ? conceptPath : incidentPath)(part.to.id)} className={linkStyle}>
+          <Link key={i} to={sitePaths[part.to.kind](part.to.id)} className={linkStyle}>
             {part.text}
           </Link>
         ),

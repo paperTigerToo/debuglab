@@ -171,6 +171,7 @@ test('completing Bad Deploy by its Expert Path reaches a clean Debrief, saved ac
   const study = page.getByRole('region', { name: 'Study next' })
   await expect(study.getByRole('link', { name: 'Mitigate first, then investigate' })).toBeVisible()
   await expect(study.getByRole('link', { name: /Logging Architecture/ })).toHaveAttribute('href', /kubernetes\.io/)
+  await expect(study.getByRole('link', { name: 'How do I keep the Evidence before changing anything?' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Back to all Incidents' }).click()
   const card = page.getByRole('link', { name: /Bad Deploy/ })
@@ -201,7 +202,7 @@ test('Hints reveal three tiers and follow the investigation', async ({ page }) =
   await hint.getByRole('button', { name: 'Ask for a Hint' }).click()
   await expect(hint).toContainText('Are the pantry-api pods running, crashing, or new?')
   await hint.getByRole('button', { name: 'Show the Playbook Entry' }).click()
-  await expect(hint).toContainText('Are the pods running, and since when?')
+  await expect(hint.getByRole('link', { name: 'Are the pods running, and since when?' })).toHaveAttribute('href', /playbook\/are-the-pods-running$/)
   await hint.getByRole('button', { name: 'Show the exact command' }).click()
   await expect(hint.getByRole('code')).toHaveText('kubectl get pods')
   await expect(hint.getByRole('button', { name: /^(Ask for|Show the)/ })).toHaveCount(0)

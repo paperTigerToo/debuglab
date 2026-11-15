@@ -519,13 +519,13 @@ redis   1/1     1            1           212d`,
       output: {
         failing: `NAME                    DESIRED   CURRENT   READY   AGE
 pantry-api-6d8f9c7b54   3         3         3       12m
-pantry-api-84b7d5f9cd   0         0         0       6d
-pantry-api-5f7c9d8b6a   0         0         0       19d
+pantry-api-84b7d5f9cd   0         0         0       6d3h
+pantry-api-5f7c9d8b6z   0         0         0       19d
 redis-7c9d5b8f6         1         1         1       212d`,
         'rolled-back': `NAME                    DESIRED   CURRENT   READY   AGE
-pantry-api-84b7d5f9cd   3         3         3       6d
+pantry-api-84b7d5f9cd   3         3         3       6d3h
 pantry-api-6d8f9c7b54   0         0         0       13m
-pantry-api-5f7c9d8b6a   0         0         0       19d
+pantry-api-5f7c9d8b6z   0         0         0       19d
 redis-7c9d5b8f6         1         1         1       212d`,
         outage: `NAME              DESIRED   CURRENT   READY   AGE
 redis-7c9d5b8f6   1         1         1       212d`,
@@ -840,45 +840,45 @@ shm              64M     0   64M   0% /dev/shm`),
     {
       goal: { finding: 'recent-rollout' },
       question: 'Start broad. Are the pantry-api pods running, crashing, or new?',
-      playbook: 'Are the pods running, and since when?',
+      playbook: 'are-the-pods-running',
       command: 'kubectl get pods',
     },
     {
       goal: { finding: 'deploy-correlates' },
       question: 'The pods are young and healthy. What changed shortly before the alert fired?',
-      playbook: 'What was deployed, and when?',
+      playbook: 'what-was-deployed',
       command: 'kubectl rollout history deployment/pantry-api',
     },
     {
       goal: { finding: 'checkout-fails' },
       needs: { evidence: 'api-logs' },
       question: 'A release lines up with the alert. What errors is the new version printing?',
-      playbook: 'What is the application logging?',
+      playbook: 'what-is-the-application-logging',
       command: 'kubectl logs deployment/pantry-api --tail=20',
     },
     {
       goal: { captured: 'api-logs' },
       question: 'Customers are failing to check out, so you will want to roll back. What happens to these pods and their logs when you do?',
-      playbook: 'How do I keep evidence before changing anything?',
+      playbook: 'how-do-i-keep-the-evidence',
       command: 'kubectl logs deployment/pantry-api > pantry-api-v2.14.0.log',
     },
     {
       goal: { state: 'rolled-back' },
       question: 'Checkouts are still failing. What is the fastest safe way to stop the harm, before you know the cause?',
-      playbook: 'How do I roll back a Deployment?',
+      playbook: 'how-do-i-roll-back-a-deployment',
       command: 'kubectl rollout undo deployment/pantry-api',
     },
     {
       goal: { finding: 'payments-url-missing' },
       needs: { evidence: 'api-logs' },
       question: 'The payments address is "undefined". Did the service complain about its configuration when it started?',
-      playbook: 'What is the application logging?',
+      playbook: 'what-is-the-application-logging',
       command: 'grep -i warn pantry-api-v2.14.0.log',
     },
     {
       goal: { finding: 'manifest-old-name' },
       question: 'The service looks for PAYMENTS_URL. What configuration did the Deployment actually give the v2.14.0 containers?',
-      playbook: 'What configuration is a container running with?',
+      playbook: 'what-configuration-is-a-container-running-with',
       command: 'kubectl rollout history deployment/pantry-api --revision=42',
     },
   ],

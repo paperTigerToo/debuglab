@@ -16,6 +16,22 @@ export type Resource = {
 
 export const resources: readonly Resource[] = [
   {
+    id: 'k8s-debug-pods',
+    title: 'Debug Pods',
+    publisher: 'Kubernetes documentation',
+    url: 'https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/',
+    subject: 'Kubernetes',
+    why: 'What each pod status means, from Pending to CrashLoopBackOff, and the first command to run for each.',
+  },
+  {
+    id: 'kubectl-quick-reference',
+    title: 'kubectl Quick Reference',
+    publisher: 'Kubernetes documentation',
+    url: 'https://kubernetes.io/docs/reference/kubectl/quick-reference/',
+    subject: 'Kubernetes',
+    why: 'The everyday kubectl commands on one page, including logs, exec, rollouts and output formats, to keep open while you work.',
+  },
+  {
     id: 'sre-managing-incidents',
     title: 'Managing Incidents',
     publisher: 'Google, Site Reliability Engineering',

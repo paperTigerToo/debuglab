@@ -10,6 +10,8 @@ export type Term = {
   explanation: string
   /** The Concept that explains this term in full, linked from its tooltip. */
   concept?: string
+  /** Or the Playbook Entry that puts it into practice, linked from its tooltip. A term links to one or the other. */
+  playbook?: string
 }
 
 export const terms: readonly Term[] = [
@@ -169,11 +171,13 @@ export const terms: readonly Term[] = [
   },
   {
     id: 'rollout-history',
+    playbook: 'what-was-deployed',
     matches: ['rollout history'],
     explanation: 'Lists a Deployment\'s revisions. Add --revision=N to see exactly what one contained.',
   },
   {
     id: 'rollout-undo',
+    playbook: 'how-do-i-roll-back-a-deployment',
     matches: ['rollout undo'],
     explanation: 'Rolls a Deployment back to its previous revision. Changes the system: the current pods are replaced.',
   },
@@ -190,6 +194,7 @@ export const terms: readonly Term[] = [
   },
   {
     id: 'logs',
+    playbook: 'what-is-the-application-logging',
     matches: ['logs'],
     explanation: "Lines a program writes about what it is doing. kubectl logs prints a container's, and they last only as long as its pod.",
   },

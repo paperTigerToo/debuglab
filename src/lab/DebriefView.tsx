@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { concepts } from '../content/concepts'
+import { entryById } from '../content/playbook'
 import { resources } from '../content/resources'
 import type { Debrief } from '../engine/engine'
-import { conceptPath } from '../site/paths'
+import { conceptPath, playbookPath } from '../site/paths'
 import { Cite } from '../site/Prose'
 import { Annotated } from '../site/Term'
 
@@ -205,7 +206,7 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
       </Section>
 
       <Section title="Study next">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <p className="text-muted">Concepts this Incident exercised</p>
             <ul className="mt-1 space-y-1">
@@ -218,6 +219,19 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
                     </Link>
                   </li>
                 ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-muted">Playbook Entries it used</p>
+            <ul className="mt-1 space-y-1">
+              {d.playbookEntries.map(({ id, hinted }) => (
+                <li key={id}>
+                  <Link to={playbookPath(id)} className="text-accent hover:underline">
+                    {entryById(id)?.question ?? id}
+                  </Link>
+                  {hinted && <span className="block text-xs text-muted">You asked for a Hint here</span>}
+                </li>
+              ))}
             </ul>
           </div>
           <div>

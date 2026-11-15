@@ -72,6 +72,13 @@ test('a tooltip links to the Concept that explains its term, by pointer', async 
   await expect(page.getByRole('heading', { level: 1, name: 'Mitigate first, then investigate' })).toBeVisible()
 })
 
+test('a tooltip can link to a Playbook Entry instead of a Concept', async ({ page }) => {
+  await page.goto('concepts/investigating-by-hypothesis')
+  await page.getByRole('button', { name: 'logs', exact: true }).first().hover()
+  await page.getByRole('link', { name: /Read the Playbook Entry: What is the application logging\?/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'What is the application logging?' })).toBeVisible()
+})
+
 test('a tooltip link is reachable by keyboard, and Tab moves on past it', async ({ page }) => {
   await page.goto('./')
   const term = page.getByRole('button', { name: 'Mitigation' })

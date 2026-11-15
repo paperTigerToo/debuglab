@@ -30,6 +30,8 @@ export type Debrief = {
   prevention: readonly string[]
   /** What to study next. */
   links: IncidentLinks
+  /** The Playbook Entries this Incident's Hints name, in order, marking those the Learner asked a Hint about. */
+  playbookEntries: { id: string; hinted: boolean }[]
 }
 
 /** The Debrief for a finished session. Throws if the session has no outcome. */
@@ -78,6 +80,7 @@ export function debrief(definition: IncidentDefinition, state: SessionState): De
     postmortem: definition.postmortem,
     prevention: definition.prevention,
     links: definition.links,
+    playbookEntries: playbookEntries(definition, state),
   }
 }
 
@@ -86,4 +89,13 @@ function commandKey(definition: IncidentDefinition, text: string): string {
   const { command, file } = splitRedirect(text)
   const stages = splitPipes(command).map((stage) => canonical(stage, definition.namespace))
   return stages.join(' | ') + (file ? ' > FILE' : '')
+}
+
+function playbookEntries(definition: IncidentDefinition, state: SessionState): Debrief['playbookEntries'] {
+  const entries = new Map<string, boolean>()
+  definition.hints.forEach((hint, index) => {
+    const hinted = (state.hintTiers[index] ?? 0) > 0
+    entries.set(hint.playbook, (entries.get(hint.playbook) ?? false) || hinted)
+  })
+  return [...entries].map(([id, hinted]) => ({ id, hinted }))
 }
