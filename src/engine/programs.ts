@@ -114,7 +114,14 @@ export const programs: Record<string, ProgramSpec> = {
   ping: linuxTool,
   journalctl: linuxTool,
   systemctl: linuxTool,
-  psql: linuxTool,
+  psql: {
+    clustersFreely: true,
+    flags: [
+      { name: 'username', spellings: ['-U', '--username'], takesValue: true },
+      { name: 'dbname', spellings: ['-d', '--dbname'], takesValue: true },
+      { name: 'command', spellings: ['-c', '--command'], takesValue: true },
+    ],
+  },
   'redis-cli': linuxTool,
   helm: linuxTool,
   docker: linuxTool,

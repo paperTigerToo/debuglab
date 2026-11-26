@@ -244,6 +244,48 @@ export const terms: readonly Term[] = [
     explanation: 'Kubernetes is stopping a container, for example because a rollout replaced its pod.',
   },
   {
+    id: 'oomkilled',
+    playbook: 'why-does-this-container-keep-restarting',
+    matches: ['OOMKilled'],
+    explanation: 'The kernel killed the container for using more memory than its limit. Kubernetes restarts it, and everything it held in memory is gone.',
+  },
+  {
+    id: 'last-state',
+    matches: ['Last State'],
+    explanation: 'How the container’s previous run ended, with a reason and an exit code. After a restart, it is where the cause is kept.',
+  },
+  {
+    id: 'exit-code',
+    matches: ['Exit Code', '137'],
+    explanation: 'The number a process ended with. 0 means success; 137 is 128 + 9, killed with SIGKILL, usually for memory.',
+  },
+  {
+    id: 'limits',
+    matches: ['Limits'],
+    explanation: 'The most CPU and memory a container may use. Crossing the CPU limit slows it down; crossing the memory limit gets it killed.',
+  },
+  {
+    id: 'requests',
+    matches: ['Requests'],
+    explanation: 'The CPU and memory Kubernetes reserves for a container when it chooses a node. A container may use more, up to its limit.',
+  },
+  {
+    id: 'kubectl-top',
+    playbook: 'what-is-using-cpu-and-memory',
+    matches: ['kubectl top'],
+    explanation: 'Shows the CPU and memory pods or nodes are using now, as last sampled by the cluster’s metrics server. 1000m is one CPU core.',
+  },
+  {
+    id: 'rollout-restart',
+    matches: ['rollout restart'],
+    explanation: 'Replaces every pod of a Deployment with a fresh one running the same release. Whatever the old processes held in memory is lost.',
+  },
+  {
+    id: 'statefulset',
+    matches: ['StatefulSet', 'statefulset'],
+    explanation: 'Runs pods that need a stable name and their own disk, such as a database. postgres-0 keeps its name and data across restarts.',
+  },
+  {
     id: 'scaling-replicaset',
     matches: ['ScalingReplicaSet'],
     explanation: 'A Deployment changed how many pods a ReplicaSet runs. During a rollout the new one grows as the old one shrinks.',
@@ -255,6 +297,7 @@ export const terms: readonly Term[] = [
   { id: 'flag-o', matches: ['-o', '--output'], explanation: 'Output format. -o wide adds columns such as the pod IP and node.' },
   { id: 'flag-it', matches: ['-it'], explanation: '-i keeps input open and -t gives you a terminal: together they make an interactive shell.' },
   { id: 'flag-revision', matches: ['--revision'], explanation: 'Show the pod template of one revision: image, configuration and probes.' },
+  { id: 'flag-previous', matches: ['--previous'], explanation: 'For kubectl logs: show the logs of the container’s previous run, the one that crashed or was killed.' },
   { id: 'flag-to-revision', matches: ['--to-revision'], explanation: 'Roll back to this revision instead of the previous one.' },
   { id: 'flag-grep-i', matches: ['-i'], explanation: 'For grep: ignore case. For kubectl exec: keep input open.' },
   { id: 'double-dash', matches: ['--'], explanation: 'Everything after -- is the command to run in the container, not options for kubectl.' },
@@ -270,6 +313,8 @@ export const terms: readonly Term[] = [
   // --- HTTP, signals and the Target System --------------------------------------------------
   { id: '5xx', matches: ['5xx'], explanation: 'HTTP status codes from 500 to 599: the service failed to answer. 4xx codes mean the request itself was wrong.' },
   { id: 'status-500', matches: ['500'], explanation: 'HTTP 500 Internal Server Error: the service hit an error it did not handle.' },
+  { id: 'status-502', matches: ['502'], explanation: 'HTTP 502 Bad Gateway: the load balancer got no proper answer from the pod, for example because it died mid-request.' },
+  { id: 'status-504', matches: ['504'], explanation: 'HTTP 504 Gateway Timeout: the load balancer gave up waiting for the pod to answer.' },
   { id: 'status-503', matches: ['503'], explanation: 'HTTP 503 Service Unavailable: nothing could answer, for example because no pods were running.' },
   {
     id: 'percentile',
@@ -302,5 +347,72 @@ export const terms: readonly Term[] = [
   },
   { id: 'type-error', matches: ['TypeError'], explanation: 'A JavaScript error: a value was not the type the code expected.' },
   { id: 'env-var', matches: ['PAYMENTS_URL', 'PAYMENT_SERVICE_URL'], explanation: 'An environment variable for the payments service address. The name the code reads must match the name that is set.' },
+  {
+    id: 'memory-leak',
+    matches: ['leak', 'leaks', 'leaking'],
+    explanation: 'Memory a program keeps holding after it stops needing it, so its use grows until something runs out.',
+  },
+  {
+    id: 'heap',
+    matches: ['heap'],
+    explanation: 'The memory a program keeps its objects in. Node.js frees objects nothing refers to any more; anything still referenced stays.',
+  },
+  {
+    id: 'pool',
+    matches: ['pool'],
+    explanation: 'Database connections a service keeps open and shares between requests. When every one is busy, new requests wait for one.',
+  },
+
+  // --- PostgreSQL ---------------------------------------------------------------------------
+  { id: 'psql', matches: ['psql'], explanation: 'PostgreSQL’s command-line client. -U names the database user and -c runs one statement and prints the result.' },
+  {
+    id: 'pg-stat-activity',
+    playbook: 'what-is-the-database-doing-right-now',
+    matches: ['pg_stat_activity'],
+    explanation: 'A built-in view with one row per database connection: what it is running, since when, and what it is waiting for.',
+  },
+  {
+    id: 'wait-event',
+    matches: ['wait_event'],
+    explanation: 'What a PostgreSQL connection is waiting for: reading data, a lock, the client. Empty means it is busy on the CPU.',
+  },
+  {
+    id: 'explain',
+    playbook: 'why-is-this-query-slow',
+    matches: ['EXPLAIN', 'EXPLAIN ANALYZE'],
+    explanation: 'Shows how PostgreSQL will run a query. EXPLAIN ANALYZE also runs it and reports the real time each step took.',
+  },
+  {
+    id: 'seq-scan',
+    matches: ['Seq Scan', 'Parallel Seq Scan'],
+    explanation: 'Reading every row of a table to find the ones that match. Fine for small tables; slow for millions of rows.',
+  },
+  {
+    id: 'index-scan',
+    matches: ['Index Scan'],
+    explanation: 'Finding matching rows through an index, reading only those rows instead of the whole table.',
+  },
+  {
+    id: 'indexes',
+    matches: ['Indexes'],
+    explanation: 'A table’s lookup structures. Each lets the database find rows by a column’s value without reading every row.',
+  },
+  {
+    id: 'concurrently',
+    playbook: 'how-do-i-add-an-index-without-blocking-writes',
+    matches: ['CONCURRENTLY'],
+    explanation: 'Builds or drops an index without locking the table against writes. Slower, and it cannot run inside a transaction.',
+  },
+  {
+    id: 'migration',
+    matches: ['migration', 'migrations', 'Migration'],
+    explanation: 'A versioned script that changes the database’s structure as part of a release. Rolling back the code does not undo it.',
+  },
+  {
+    id: 'slow-query-log',
+    playbook: 'which-queries-are-slow',
+    matches: ['log_min_duration_statement'],
+    explanation: 'A PostgreSQL setting: log every statement slower than this, with how long it took. It turns on the slow query log.',
+  },
   { id: 'canary', matches: ['canary'], explanation: 'Sending a small share of traffic to a new version first, so a bad release harms few people.' },
 ]

@@ -19,4 +19,4 @@
 - From ticket 08: consider splitting the term list by owner (glossary words, reference, per-Incident terms), and whether bare numbers such as 500 should be marked as status codes.
 - From ticket 10: worth asking the Learner whether the Playbook's sample output should carry tooltips like the terminal does, and whether opening a Playbook Entry from a Hint in a new tab suits them.
 - From ticket 11: ask whether the animations feel quick enough, the alert pulse in particular, and whether a phone Learner wants "Open it anyway" remembered.
-
+- Tickets 13 and 14 went ahead before this checkpoint at the owner's request. Feedback from it may come back onto them: they follow Bad Deploy's shape (terminal Evidence saved to a file, three-tier Hints, the same Debrief).

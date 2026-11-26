@@ -1,5 +1,6 @@
 import type { AccessLogLine, Dashboard, Deploy } from '../engine/types'
 import { defineIncident } from '../engine/types'
+import { access, clock, pad, round, unavailable503, wobble } from './build'
 
 // Bad Deploy: release v2.14.0 of pantry-api renamed a config key from PAYMENT_SERVICE_URL to
 // PAYMENTS_URL, but the Deployment manifest still sets the old name. Health checks pass, so the
@@ -29,8 +30,6 @@ const datastorePods = [
   { name: 'postgres-0', ip: '10.42.0.12', node: 'node-a' },
   { name: 'redis-7c9d5b8f6-hq2lw', ip: '10.42.2.7', node: 'node-c' },
 ]
-
-const pad = (text: string, width: number) => text.padEnd(width)
 
 function getPods(api: Placement[]): string {
   const rows = [
@@ -272,14 +271,7 @@ module.exports = { createCharge }`
 // ---------------------------------------------------------------------------------------------
 // Dashboard
 
-const startMinute = 13 * 60 + 45
-const label = (i: number) => {
-  const m = startMinute + i
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-}
-/** Gentle, repeatable wobble so graphs look measured rather than drawn with a ruler. */
-const wobble = (i: number, size: number) => size * (Math.sin(i * 1.7) * 0.6 + Math.sin(i * 0.53 + 1) * 0.4)
-const round = (n: number, places = 1) => Math.round(n * 10 ** places) / 10 ** places
+const label = clock('13:45')
 
 const DEPLOY_AT = 17 // 14:02
 const ACTION_AT = 30 // 14:15
@@ -307,15 +299,6 @@ const history: Deploy[] = [
   { revision: 41, version: 'v2.13.1', at: 'Sun 8 Nov 10:41 UTC', by: 'ci: pipeline #1851' },
   { revision: 40, version: 'v2.13.0', at: 'Mon 26 Oct 15:20 UTC', by: 'ci: pipeline #1802' },
 ]
-
-const access = (time: string, method: string, path: string, status: number, ms: number, upstream: string): AccessLogLine => ({
-  time,
-  method,
-  path,
-  status,
-  ms,
-  upstream,
-})
 
 // Upstream addresses nginx forwards to: the v2.14.0 pods, then the rolled-back v2.13.1 pods.
 const [a, b, c] = newPods.map((p) => `${p.ip}:8080`) as [string, string, string]
@@ -368,9 +351,12 @@ const failingTimeline = timeline(30, (i) => (i < DEPLOY_AT ? 'before' : 'broken'
 const recoveredTimeline = timeline(36, (i) => (i < DEPLOY_AT ? 'before' : i <= ACTION_AT ? 'broken' : 'recovered'))
 const downTimeline = timeline(33, (i) => (i < DEPLOY_AT ? 'before' : i <= ACTION_AT ? 'broken' : 'down'))
 
+const saturationOf = 'API CPU of limit'
+
 const dashboard = {
   failing: {
     alert: { status: 'firing', summary: 'pantry-api is returning server errors on about 9% of requests.' },
+    saturationOf,
     ...failingTimeline,
     markers: [{ at: DEPLOY_AT, label: 'v2.14.0' }],
     deploys: history,
@@ -378,6 +364,7 @@ const dashboard = {
   },
   'rolled-back': {
     alert: { status: 'resolved', summary: 'Resolved at 14:19: server errors back under 5% for 3 minutes.' },
+    saturationOf,
     ...recoveredTimeline,
     markers: [
       { at: DEPLOY_AT, label: 'v2.14.0' },
@@ -388,6 +375,7 @@ const dashboard = {
   },
   outage: {
     alert: { status: 'firing', summary: 'pantry-api has no running pods: nginx answers every request with 503.' },
+    saturationOf,
     ...downTimeline,
     markers: [
       { at: DEPLOY_AT, label: 'v2.14.0' },
@@ -402,13 +390,6 @@ const dashboard = {
 
 const findManifest = { finding: 'manifest-old-name', seenIn: 'PAYMENT_SERVICE_URL' } as const
 const both = <T,>(value: T) => ({ failing: value, 'rolled-back': value })
-const unavailable503 = `<html>
-<head><title>503 Service Temporarily Unavailable</title></head>
-<body>
-<center><h1>503 Service Temporarily Unavailable</h1></center>
-<hr><center>nginx</center>
-</body>
-</html>`
 
 const rollbackMutation = {
   warning:

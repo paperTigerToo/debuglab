@@ -126,6 +126,12 @@ describe('Hints', () => {
     })
   })
 
+  test('a state goal may name several states, and reaching any of them meets it', () => {
+    const goal = { state: ['failing', 'mitigated'] as const }
+    const either = { ...incident, hints: [{ goal, question: 'Stopped?', playbook: 'roll-back', command: 'kubectl rollout undo deployment/api' }] }
+    expect(currentHint(either, start(either))).toBeUndefined()
+  })
+
   test('when every goal is met there is no Hint left', () => {
     expect(currentHint(incident, play(...expertPath))).toBeUndefined()
   })

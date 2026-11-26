@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { badDeploy } from '../incidents/bad-deploy'
+import { incidents } from '../incidents'
 import { annotate } from './annotate'
 import { terms } from './terms'
 
@@ -16,8 +16,8 @@ test('every explanation is short enough for a tooltip', () => {
   }
 })
 
-test('the Bad Deploy Expert Path explains every command it uses', () => {
-  for (const step of badDeploy.expertPath) {
+test.each(incidents.map((i) => [i.title, i] as const))('the %s Expert Path explains every command it uses', (_title, incident) => {
+  for (const step of incident.expertPath) {
     const first = annotate(step.command, terms)[0]
     expect(typeof first === 'string' ? undefined : first?.term.id, step.command).toBeDefined()
   }

@@ -6,6 +6,7 @@ export function dashboardFixture(status: 'firing' | 'resolved', summary: string 
     alert: { status, summary },
     minutes: ['14:00', '14:01'],
     signals: { requests: [1, 1], errors: [0, 0], latency: [1, 1], saturation: [1, 1] },
+    saturationOf: 'CPU',
     markers: [],
     deploys: [],
     logs: [],

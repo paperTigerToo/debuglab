@@ -12,3 +12,4 @@
 ## Comments
 
 - From ticket 09: the content integrity test requires every Concept to be practised by at least one Incident (via the Incident's links), so each new Concept needs an Incident that names it. Concept summaries must stay plain text; links go in the body. The Debrief's "Study next" lists the Incident's linked Concepts, so link the prevention Concept from Bad Deploy to satisfy spec story 76.
+- From tickets 13 and 14: Memory Leak and Slow Query both turn on the saturation signal (memory of limit, database CPU), so link the golden signals Concept from both. Slow Query's lesson "a rollback restores code, not the database" belongs in the prevention or working-safely Concept.

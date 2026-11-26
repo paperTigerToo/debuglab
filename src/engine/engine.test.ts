@@ -24,6 +24,8 @@ const incident = defineIncident({
       reveals: [{ finding: 'throws', seenIn: 'ERROR checkout failed' }],
     },
     { match: ['ps aux'], output: 'USER PID' },
+    { match: ['psql -U shop -c "SELECT 1"'], output: ' ?column?' },
+    { match: [`psql -c "SELECT 'a', 2"`], where: 'container', output: 'ran in the container' },
   ],
   evidence: {},
   resources: ['pod/api-7f9c-2xk', 'deployment/api'],
@@ -79,6 +81,17 @@ describe('forgiving command matching', () => {
 
   test('accepts clustered short flags in any order', () => {
     expect(run('ps xua').text).toContain('USER PID')
+  })
+
+  test.each([
+    ['flags in another order', `psql -c "SELECT 1" -U shop`],
+    ['long flags', `psql --username=shop --command 'SELECT 1'`],
+  ])('accepts psql with %s', (_why, text) => {
+    expect(run(text).text).toContain('?column?')
+  })
+
+  test('keeps a quoted argument whole when kubectl exec runs it in a container', () => {
+    expect(run(`kubectl exec api-7f9c-2xk -- psql -c "SELECT 'a', 2"`).text).toContain('ran in the container')
   })
 
   test('does not match a different namespace', () => {

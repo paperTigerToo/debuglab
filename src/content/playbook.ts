@@ -357,6 +357,448 @@ export const playbook: readonly PlaybookEntry[] = [
     ],
     links: { concepts: ['investigating-by-hypothesis'], resources: ['kubectl-quick-reference'] },
   },
+  {
+    id: 'why-does-this-container-keep-restarting',
+    question: 'Why does this container keep restarting?',
+    layer: 'Container',
+    summary:
+      'A restart wipes the evidence of why the container stopped, except for a few lines Kubernetes keeps: how the last run ended, and its logs.',
+    commands: [
+      {
+        text: 'kubectl describe pod pantry-api-7f9c6d5b48-n2x8v',
+        effect: 'read-only',
+        what: 'Shows the container’s current state and its Last State: how the previous run ended, with a reason and an exit code.',
+      },
+      {
+        text: 'kubectl logs pantry-api-7f9c6d5b48-n2x8v --previous',
+        effect: 'read-only',
+        what: 'Prints the logs of the run before this one. Without --previous you only see the fresh container, which has not failed yet.',
+      },
+      {
+        text: 'kubectl get events --sort-by=.lastTimestamp',
+        effect: 'read-only',
+        what: 'Recent events, newest last: failed probes, kills and back-offs.',
+      },
+    ],
+    healthy: {
+      label: 'Never restarted',
+      output: table(
+        '    State:          Running',
+        '      Started:      Mon, 16 Nov 2026 11:13:02 +0000',
+        '    Ready:          True',
+        '    Restart Count:  0',
+      ),
+      notes: [{ mark: 'Restart Count:  0', note: 'This container has run since it started. There is no Last State to read.' }],
+    },
+    unhealthy: {
+      label: 'Killed for memory',
+      output: table(
+        '    State:          Running',
+        '      Started:      Thu, 19 Nov 2026 09:10:39 +0000',
+        '    Last State:     Terminated',
+        '      Reason:       OOMKilled',
+        '      Exit Code:    137',
+        '      Started:      Thu, 19 Nov 2026 08:30:44 +0000',
+        '      Finished:     Thu, 19 Nov 2026 09:10:37 +0000',
+        '    Restart Count:  4',
+        '    Limits:',
+        '      memory:  512Mi',
+      ),
+      notes: [
+        { mark: 'OOMKilled', note: 'The kernel killed the process for using more memory than its limit.' },
+        { mark: '137', note: '128 + 9: the process received SIGKILL. It had no chance to log anything or shut down cleanly.' },
+        { mark: '08:30:44', note: 'The previous run lasted 40 minutes. A process that dies after a steady interval is often filling up with something.' },
+        { mark: '512Mi', note: 'The limit it crossed.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'The reason is OOMKilled',
+        then: 'Find out whether memory is simply too tight or keeps growing: [Which pods are using the most CPU and memory?](playbook:what-is-using-cpu-and-memory)',
+      },
+      {
+        if: 'The reason is Error, with an exit code such as 1',
+        then: 'The application exited by itself. Its last words are in the previous run’s logs: [What is the application logging?](playbook:what-is-the-application-logging), with --previous.',
+      },
+      {
+        if: 'The events say the liveness probe failed',
+        then: 'Kubernetes restarted a container that stopped answering its health check. Find out why it stopped answering before you loosen the probe.',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['k8s-pod-failure-reason', 'k8s-debug-pods'] },
+  },
+  {
+    id: 'what-is-using-cpu-and-memory',
+    question: 'Which pods are using the most CPU and memory?',
+    layer: 'Container',
+    summary:
+      'A quick look at saturation. It shows which pod is doing the work, or holding the memory, and how close each is to its limit.',
+    commands: [
+      { text: 'kubectl top pods', effect: 'read-only', what: 'CPU in millicores (1000m is one core) and memory for each pod, as last sampled by the cluster’s metrics server.' },
+      { text: 'kubectl top nodes', effect: 'read-only', what: 'The same for each node, to see whether a whole machine is short of capacity.' },
+      {
+        text: 'kubectl describe deployment pantry-api',
+        effect: 'read-only',
+        what: 'Shows the Limits and Requests to compare the figures with. top shows usage, not limits.',
+      },
+    ],
+    healthy: {
+      label: 'Steady',
+      output: table(
+        'NAME                          CPU(cores)   MEMORY(bytes)',
+        'pantry-api-5c8d9f7b46-b4xpl   79m          139Mi',
+        'pantry-api-5c8d9f7b46-g8kzs   84m          142Mi',
+        'pantry-api-5c8d9f7b46-w2nfd   77m          136Mi',
+        'postgres-0                    402m         1236Mi',
+      ),
+      notes: [
+        { mark: '142Mi', note: 'Similar memory in every pantry-api pod, far below a 512Mi limit, and it stays there over time.' },
+        { mark: '402m', note: 'PostgreSQL is using 0.4 of its 2 cores: busy, with room to spare.' },
+      ],
+    },
+    unhealthy: {
+      label: 'Growing memory',
+      output: table(
+        'NAME                          CPU(cores)   MEMORY(bytes)',
+        'pantry-api-7f9c6d5b48-kq7wz   71m          185Mi',
+        'pantry-api-7f9c6d5b48-n2x8v   164m         487Mi',
+        'pantry-api-7f9c6d5b48-t5hzr   102m         307Mi',
+      ),
+      notes: [
+        { mark: '487Mi', note: 'Nearly at its 512Mi limit. This is the container that restarted longest ago.' },
+        { mark: '185Mi', note: 'Restarted 6 minutes ago. Memory that rises with uptime, pod after pod, is the shape of a leak.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'Memory is close to the limit and higher the longer a container has run',
+        then: 'Something accumulates. Look at what before anything replaces the process: [What is the process holding in memory?](playbook:what-is-the-process-holding-in-memory)',
+      },
+      {
+        if: 'The database pod is the busy one, and the API pods are nearly idle',
+        then: 'The API is waiting on the database. Ask it what it is working on: [What is the database doing right now?](playbook:what-is-the-database-doing-right-now)',
+      },
+      {
+        if: 'Every pod is busy in proportion to traffic',
+        then: 'The service may simply need more capacity. Check the request rate on the dashboard before you look for a defect.',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['k8s-manage-resources', 'gregg-methodology'] },
+  },
+  {
+    id: 'what-is-the-process-holding-in-memory',
+    question: 'What is the process holding in memory?',
+    layer: 'Application',
+    summary:
+      'Memory that only grows is held by something: a cache, a queue, a list of listeners. The live process can tell you what, but only until it is restarted.',
+    commands: [
+      {
+        text: 'kubectl exec pantry-api-7f9c6d5b48-n2x8v -- curl -s localhost:8080/metrics',
+        effect: 'read-only',
+        what: 'Asks the process for its own metrics: heap size, garbage collection, and the size of any cache or queue the code reports.',
+      },
+      {
+        text: 'kubectl exec pantry-api-7f9c6d5b48-n2x8v -- curl -s localhost:8080/metrics > pantry-api-metrics.txt',
+        effect: 'read-only',
+        what: 'Saves the same on your machine, so it outlives the process.',
+      },
+      {
+        text: 'kubectl exec pantry-api-7f9c6d5b48-n2x8v -- kill -USR2 1',
+        effect: 'mutating',
+        what: 'If Node.js runs with --heapsnapshot-signal=SIGUSR2, writes a heap snapshot you can open in Chrome DevTools. The process freezes while it writes, which can take seconds, and the file stays in the container until you copy it out with kubectl cp.',
+      },
+    ],
+    healthy: {
+      label: 'A bounded cache',
+      output: table(
+        'nodejs_heap_size_used_bytes 63412224',
+        'pantry_search_cache_entries 5000',
+        'pantry_search_cache_hits_total 88123',
+        'pantry_search_cache_evictions_total 41762',
+      ),
+      notes: [
+        { mark: 'pantry_search_cache_entries 5000', note: 'At its configured maximum, and staying there.' },
+        { mark: 'pantry_search_cache_evictions_total 41762', note: 'Old entries are removed to make room for new ones, so memory stays flat.' },
+      ],
+    },
+    unhealthy: {
+      label: 'A cache that only grows',
+      output: table(
+        'nodejs_heap_size_used_bytes 438861824',
+        'pantry_search_cache_entries 186204',
+        'pantry_search_cache_hits_total 1655',
+        'pantry_search_cache_evictions_total 0',
+      ),
+      notes: [
+        { mark: '438861824', note: 'About 419Mi of JavaScript heap, most of a 512Mi limit.' },
+        { mark: 'pantry_search_cache_hits_total 1655', note: 'Under 1 search in 100 is answered from the cache: its entries are almost never reused.' },
+        { mark: 'pantry_search_cache_evictions_total 0', note: 'Nothing has ever been removed. Every search adds memory that is never given back.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'A cache or queue grows and never shrinks',
+        then: 'That is what holds the memory. Stop the harm with a [rollback](playbook:how-do-i-roll-back-a-deployment), then read the code that fills it.',
+      },
+      {
+        if: 'The heap is small, but the container’s memory keeps growing',
+        then: 'The memory is outside the JavaScript heap, in buffers or native code. [Memory Diagnostics](resource:nodejs-memory-diagnostics) covers the tools for that.',
+      },
+      {
+        if: 'The process reports nothing useful',
+        then: 'Take two heap snapshots some minutes apart and compare what grew between them. Expect a pause while each is written.',
+      },
+    ],
+    links: { concepts: ['mitigate-then-investigate'], resources: ['nodejs-memory-diagnostics', 'gregg-memory-leaks'] },
+  },
+  {
+    id: 'what-is-the-database-doing-right-now',
+    question: 'What is the database doing right now?',
+    layer: 'Database',
+    summary:
+      'PostgreSQL lists every connection and what it is running. When the database is slow, this shows whether it is busy with one query, many queries, or waiting on locks.',
+    commands: [
+      {
+        text: `kubectl exec postgres-0 -- psql -U pantry -c "SELECT pid, now() - query_start AS runtime, wait_event, query FROM pg_stat_activity WHERE state = 'active'"`,
+        effect: 'read-only',
+        what: 'The queries running at this moment, how long each has run and what, if anything, it is waiting for.',
+      },
+      {
+        text: `kubectl exec postgres-0 -- psql -U pantry -c "SELECT pid, now() - query_start AS runtime, wait_event, query FROM pg_stat_activity WHERE state = 'active'" | tee active-queries.txt`,
+        effect: 'read-only',
+        what: 'Shows the same and keeps a copy. The picture is gone the moment a Mitigation works.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "SELECT state, count(*) FROM pg_stat_activity GROUP BY state"',
+        effect: 'read-only',
+        what: 'How many connections are active, idle, or idle inside a transaction that never finished.',
+      },
+    ],
+    healthy: {
+      label: 'Quiet',
+      output: table(
+        '  pid  |     runtime     |  wait_event  | query',
+        '-------+-----------------+--------------+------------------------------------------------',
+        ' 48214 | 00:00:00.001804 | ClientRead   | SELECT id, status, total_cents, created_at FROM orders ...',
+        '(1 row)',
+      ),
+      notes: [
+        { mark: '00:00:00.001804', note: 'Under two milliseconds: queries finish faster than you can catch them.' },
+        { mark: '(1 row)', note: 'Almost nothing is running at any moment.' },
+      ],
+    },
+    unhealthy: {
+      label: 'Piling up',
+      output: table(
+        '  pid  |     runtime     |  wait_event  | query',
+        '-------+-----------------+--------------+------------------------------------------------',
+        ' 48211 | 00:00:02.871544 |              | SELECT id, status, total_cents, created_at FROM orders WHERE customer_id = $1 ...',
+        ' 48214 | 00:00:02.644261 | DataFileRead | SELECT id, status, total_cents, created_at FROM orders WHERE customer_id = $1 ...',
+        ' 48217 | 00:00:02.512983 |              | SELECT id, status, total_cents, created_at FROM orders WHERE customer_id = $1 ...',
+        ' 48260 | 00:00:00.812417 |              | SELECT id, name, price_cents FROM products WHERE category = $1 ...',
+        '(17 rows)',
+      ),
+      notes: [
+        { mark: '00:00:02.871544', note: 'Nearly three seconds for a lookup that should take milliseconds.' },
+        { mark: 'WHERE customer_id = $1', note: 'Most rows are the same statement: one query is the trouble, not the whole workload.' },
+        { mark: 'DataFileRead', note: 'Waiting to read table data. No Lock wait events, so nothing is blocked; the database is simply busy.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'One statement dominates and each run takes seconds',
+        then: 'Find out why that statement is slow: [Why is this query slow?](playbook:why-is-this-query-slow)',
+      },
+      {
+        if: 'Queries wait with wait events of type Lock',
+        then: 'Something holds a lock. Look for a long transaction, often one left idle in transaction, and what it is holding.',
+      },
+      {
+        if: 'Nothing is running long',
+        then: 'The time is spent elsewhere. Look at the API itself: [What is the application logging?](playbook:what-is-the-application-logging)',
+      },
+    ],
+    links: { concepts: ['mitigate-then-investigate'], resources: ['pg-monitoring-stats'] },
+  },
+  {
+    id: 'which-queries-are-slow',
+    question: 'Which queries are slow?',
+    layer: 'Database',
+    summary:
+      'With the slow query log turned on, PostgreSQL writes down every statement that took longer than a threshold. It is the quickest way to name the guilty query.',
+    commands: [
+      {
+        text: 'kubectl logs postgres-0 --tail=20',
+        effect: 'read-only',
+        what: 'The database’s latest log lines. With log_min_duration_statement set, slow statements appear with their duration.',
+      },
+      {
+        text: 'kubectl logs postgres-0 | grep duration',
+        effect: 'read-only',
+        what: 'Only the slow statements, from as far back as the container’s log goes.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "SELECT calls, mean_exec_time, query FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 5"',
+        effect: 'read-only',
+        what: 'If the pg_stat_statements extension is installed: the statements that have cost the most time in total.',
+      },
+    ],
+    healthy: {
+      label: 'Nothing slow',
+      output: table(
+        '2026-11-24 11:13:02.114 UTC [61] LOG:  checkpoint starting: time',
+        '2026-11-24 11:13:09.871 UTC [61] LOG:  checkpoint complete: wrote 412 buffers (2.5%)',
+      ),
+      notes: [{ mark: 'checkpoint', note: 'Routine housekeeping. No statement crossed the threshold, so none was logged.' }],
+    },
+    unhealthy: {
+      label: 'One query, again and again',
+      output: table(
+        '2026-11-24 11:38:51.204 UTC [48211] LOG:  duration: 2412.880 ms  execute <unnamed>: SELECT id, status, total_cents, created_at FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 10',
+        "2026-11-24 11:38:51.204 UTC [48211] DETAIL:  parameters: $1 = '48213'",
+        '2026-11-24 11:38:53.241 UTC [48218] LOG:  duration: 2571.302 ms  execute <unnamed>: SELECT id, status, total_cents, created_at FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 10',
+      ),
+      notes: [
+        { mark: 'duration: 2412.880 ms', note: 'Each run takes about 2.4 seconds.' },
+        { mark: "$1 = '48213'", note: 'The value it ran with. Use it to reproduce the query with EXPLAIN.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'One statement appears over and over',
+        then: 'See what is running right now and keep a copy: [What is the database doing right now?](playbook:what-is-the-database-doing-right-now). Then [Why is this query slow?](playbook:why-is-this-query-slow)',
+      },
+      {
+        if: 'Many different statements are slow',
+        then: 'The database as a whole is short of something. Check its CPU and memory: [Which pods are using the most CPU and memory?](playbook:what-is-using-cpu-and-memory)',
+      },
+      {
+        if: 'Nothing is logged',
+        then: 'The slow query log may be off. log_min_duration_statement must be set for statements to appear.',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['pg-logging'] },
+  },
+  {
+    id: 'why-is-this-query-slow',
+    question: 'Why is this query slow?',
+    layer: 'Database',
+    summary:
+      'A query is slow because of how the database runs it. The plan shows whether it reads a few rows through an index or every row in the table.',
+    commands: [
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "\\d orders"',
+        effect: 'read-only',
+        what: 'Describes the table: its columns and, under Indexes, every index it has.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "EXPLAIN ANALYZE SELECT id, status, total_cents, created_at FROM orders WHERE customer_id = 48213 ORDER BY created_at DESC LIMIT 10"',
+        effect: 'read-only',
+        what: 'Runs the query and reports the plan with real timings. ANALYZE executes it, so never use it on a statement that writes.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "EXPLAIN SELECT id, status, total_cents, created_at FROM orders WHERE customer_id = 48213"',
+        effect: 'read-only',
+        what: 'The plan without running the query: instant, with estimated costs only.',
+      },
+    ],
+    healthy: {
+      label: 'Uses an index',
+      output: table(
+        ' Limit  (actual time=0.071..0.074 rows=10 loops=1)',
+        '   ->  Index Scan using orders_customer_id_idx on orders  (actual time=0.021..0.052 rows=33 loops=1)',
+        '         Index Cond: (customer_id = 48213)',
+        ' Execution Time: 0.093 ms',
+      ),
+      notes: [
+        { mark: 'Index Scan using orders_customer_id_idx', note: 'Jumps straight to this customer’s 33 orders through the index.' },
+        { mark: 'Execution Time: 0.093 ms', note: 'Under a tenth of a millisecond.' },
+      ],
+    },
+    unhealthy: {
+      label: 'Reads the whole table',
+      output: table(
+        ' Limit  (actual time=2391.064..2398.120 rows=10 loops=1)',
+        '   ->  Parallel Seq Scan on orders  (actual time=161.233..2384.388 rows=11 loops=3)',
+        '         Filter: (customer_id = 48213)',
+        '         Rows Removed by Filter: 1399986',
+        ' Execution Time: 2398.187 ms',
+      ),
+      notes: [
+        { mark: 'Parallel Seq Scan on orders', note: 'Reads every row of the table, in three parallel workers, to find one customer’s orders.' },
+        { mark: 'Rows Removed by Filter: 1399986', note: 'In each of three workers. About 4.2 million rows read and thrown away in all, to find 33.' },
+        { mark: 'Execution Time: 2398.187 ms', note: 'And it does this for every account page.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'A Seq Scan filters on a column that has no index',
+        then: 'Find out whether the index ever existed and what removed it: [What was deployed, and when?](playbook:what-was-deployed). Then [add it back without blocking writes](playbook:how-do-i-add-an-index-without-blocking-writes).',
+      },
+      {
+        if: 'An index exists but the plan does not use it',
+        then: 'Check \\d for an index marked INVALID, and whether the query wraps the column in a function or casts it.',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['pg-using-explain', 'pg-indexes'] },
+  },
+  {
+    id: 'how-do-i-add-an-index-without-blocking-writes',
+    question: 'How do I add an index without blocking writes?',
+    layer: 'Database',
+    summary:
+      'A plain CREATE INDEX locks the table against writes until it finishes. On a busy table, CONCURRENTLY builds the same index while writes carry on.',
+    commands: [
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "CREATE INDEX CONCURRENTLY orders_customer_id_idx ON orders (customer_id)"',
+        effect: 'mutating',
+        what: 'Builds the index without blocking inserts and updates. It takes longer and adds load while it runs, and it cannot run inside a transaction.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "\\d orders"',
+        effect: 'read-only',
+        what: 'Confirms the index exists. A concurrent build that failed leaves an index marked INVALID, which no query uses.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "DROP INDEX CONCURRENTLY orders_customer_id_idx"',
+        effect: 'mutating',
+        what: 'Removes an INVALID index so you can build it again, also without blocking writes.',
+      },
+    ],
+    healthy: {
+      label: 'Built',
+      output: table(
+        'Indexes:',
+        '    "orders_pkey" PRIMARY KEY, btree (id)',
+        '    "orders_created_at_idx" btree (created_at)',
+        '    "orders_customer_id_idx" btree (customer_id)',
+      ),
+      notes: [{ mark: '"orders_customer_id_idx" btree (customer_id)', note: 'The index exists and is valid: queries can use it at once.' }],
+    },
+    unhealthy: {
+      label: 'A failed build',
+      output: table(
+        'Indexes:',
+        '    "orders_pkey" PRIMARY KEY, btree (id)',
+        '    "orders_created_at_idx" btree (created_at)',
+        '    "orders_customer_id_idx" btree (customer_id) INVALID',
+      ),
+      notes: [
+        { mark: 'INVALID', note: 'The concurrent build was interrupted. The index is kept up to date but never used. Drop it concurrently and build it again.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'The index is built and valid',
+        then: 'Check the query plan uses it: [Why is this query slow?](playbook:why-is-this-query-slow). Then make sure the migration that removed it cannot run again.',
+      },
+      {
+        if: 'The build fails or leaves an INVALID index',
+        then: 'Drop the invalid index concurrently and build it again. Look in the database’s log for the reason, such as a deadlock or a statement timeout.',
+      },
+    ],
+    links: { concepts: ['mitigate-then-investigate'], resources: ['pg-create-index'] },
+  },
 ]
 
 export const entryById = (id: string) => playbook.find((e) => e.id === id)

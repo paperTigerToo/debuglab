@@ -32,7 +32,7 @@ export function AlertPanel({ alert, status }: { alert: Alert; status: DashboardD
 }
 
 export function Dashboard({ data }: { data: DashboardData }) {
-  const { minutes, signals, markers } = data
+  const { minutes, signals, markers, saturationOf } = data
   const chart = { minutes, markers }
   return (
     <div className="space-y-4">
@@ -40,7 +40,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
         <SignalChart {...chart} title="Request rate" unit="req/s" values={signals.requests} floor={50} format={whole} />
         <SignalChart {...chart} title="Error rate (5xx)" unit="%" values={signals.errors} floor={5} format={oneDecimal} />
         <SignalChart {...chart} title="Latency, 95th percentile" unit="ms" values={signals.latency} floor={50} format={whole} />
-        <SignalChart {...chart} title="Saturation (API CPU of limit)" unit="%" values={signals.saturation} floor={50} format={whole} />
+        <SignalChart {...chart} title={`Saturation (${saturationOf})`} unit="%" values={signals.saturation} floor={50} format={whole} />
       </section>
       <DeployHistory deploys={data.deploys} />
       <LogView logs={data.logs} />

@@ -71,9 +71,11 @@ export type Dashboard = {
     errors: readonly number[]
     /** 95th percentile latency in milliseconds. */
     latency: readonly number[]
-    /** CPU use of the API pods against their limit, in percent. */
+    /** How full the Incident's most constrained resource is, in percent; `saturationOf` names it. */
     saturation: readonly number[]
   }
+  /** What the saturation graph measures, such as "API CPU of limit" or "database CPU". */
+  saturationOf: string
   /** Changes marked on every graph, by sample index. */
   markers: readonly { at: number; label: string }[]
   /** Newest first. */
@@ -107,11 +109,14 @@ export type MitigationOption = {
   explanation: string
 }
 
-/** What a Hint leads to: a Finding, captured evidence, or a named state such as "mitigated". */
+/**
+ * What a Hint leads to: a Finding, captured evidence, or a named state such as "mitigated". A state goal
+ * may name several states when different paths stop the harm, such as mitigating before or after a rollback.
+ */
 export type HintGoal<S extends string, F extends string, E extends string> =
   | { finding: F }
   | { captured: E }
-  | { state: S }
+  | { state: S | readonly S[] }
 
 /** Graduated help towards one goal: the question, then the Playbook Entry, then the exact command. */
 export type Hint<S extends string, F extends string, E extends string> = {

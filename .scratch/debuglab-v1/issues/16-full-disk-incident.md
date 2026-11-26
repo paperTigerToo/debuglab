@@ -10,3 +10,7 @@
 - [ ] New Playbook Entries, terms and Resources linked and passing the integrity check
 - [ ] Expert Path replay and "mitigate immediately" replay tests
 - [ ] Browser test completes the Incident by typing its Expert Path
+
+## Comments
+
+- From the review of tickets 13 and 14: each Incident file still repeats kubectl table renderers (get pods, top pods), the pod spec block, describeDeployment, the dashboard `timeline` helper and the JSON log-line builder. Move them into `src/incidents/build.ts` as the next Incident needs them, rather than copying a fourth time.

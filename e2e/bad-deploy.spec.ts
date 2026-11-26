@@ -1,12 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-
-async function type(page: Page, command: string) {
-  const input = page.getByRole('textbox', { name: 'Command' })
-  await input.fill(command)
-  await input.press('Enter')
-}
-
-const output = (page: Page) => page.getByRole('log', { name: 'Terminal output' })
+import { expect, test } from '@playwright/test'
+import { finish, output, type } from './lab'
 
 test('a Learner opens Bad Deploy from the Incident Lab and sees the alert', async ({ page }) => {
   await page.goto('lab')
@@ -137,14 +130,6 @@ test('an unknown Incident address shows not found', async ({ page }) => {
   await page.goto('lab/no-such-incident')
   await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible()
 })
-
-async function finish(page: Page, rootCause: RegExp, mitigation: RegExp) {
-  await page.getByRole('button', { name: /finish the Incident/ }).click()
-  const form = page.getByRole('form', { name: 'Finish the Incident' })
-  await form.getByRole('radio', { name: rootCause }).check()
-  await form.getByRole('radio', { name: mitigation }).check()
-  await form.getByRole('button', { name: 'Finish and see the Debrief' }).click()
-}
 
 const expertPath = [
   'kubectl get pods',

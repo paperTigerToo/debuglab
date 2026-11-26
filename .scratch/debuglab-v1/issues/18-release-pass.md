@@ -10,3 +10,7 @@
 - [ ] Suggested path on the home page
 - [ ] Every Resource link opened and confirmed live
 - [ ] All five Incidents worked end to end in the browser
+
+## Comments
+
+- From tickets 13 and 14: the ten new Resource links answered 200 on 2026-11-25; check them again here.

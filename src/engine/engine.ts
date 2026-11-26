@@ -218,7 +218,13 @@ function kubectlExec(definition: IncidentDefinition, state: SessionState, analys
   if (analysis.inner.length === 0) return error('error: you must specify at least one command for the container')
   const shell = SHELLS[analysis.inner.join(' ')]
   if (shell) return { kind: 'enter-shell', location: { kind: 'container', pod, shell } }
-  return resolveSource(definition, state, analysis.inner.join(' '), { kind: 'container', pod, shell: 'sh' })
+  return resolveSource(definition, state, analysis.inner.map(requote).join(' '), { kind: 'container', pod, shell: 'sh' })
+}
+
+/** Quote a word again for re-reading, so `psql -c "SELECT 1"` keeps its query as one argument. */
+function requote(word: string): string {
+  if (!/[\s"']/.test(word)) return word
+  return word.includes('"') ? `'${word}'` : `"${word}"`
 }
 
 /** `cat FILE`, `grep PATTERN FILE`, `ls` and friends, run against the files the Learner saved. */

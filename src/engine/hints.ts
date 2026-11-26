@@ -20,7 +20,7 @@ export const MAX_TIER = 3
 export function goalReached(goal: HintGoal<string, string, string>, state: SessionState): boolean {
   if ('finding' in goal) return state.findings.includes(goal.finding)
   if ('captured' in goal) return evidenceStatus(state).captured.includes(goal.captured)
-  return state.namedState === goal.state
+  return ([] as readonly string[]).concat(goal.state).includes(state.namedState)
 }
 
 /** A Hint whose goal can no longer be reached because the evidence it needs was destroyed first. */

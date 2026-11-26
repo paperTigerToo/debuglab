@@ -2,11 +2,12 @@ import { expect, test } from '@playwright/test'
 
 test('the Playbook groups its Entries by layer, showing only layers that have some', async ({ page }) => {
   await page.goto('playbook')
-  for (const layer of ['Cluster', 'Container', 'Application']) {
+  for (const layer of ['Cluster', 'Container', 'Database', 'Application']) {
     await expect(page.getByRole('heading', { level: 2, name: layer })).toBeVisible()
   }
-  await expect(page.getByRole('heading', { level: 2, name: 'Database' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 2, name: 'Network' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Cluster' }).getByRole('link')).toHaveCount(3)
+  await expect(page.getByRole('region', { name: 'Database' }).getByRole('link')).toHaveCount(4)
 })
 
 test('searching by command finds the Entry, and opening it shows its parts', async ({ page, context }) => {
