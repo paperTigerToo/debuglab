@@ -17,7 +17,7 @@ const spaFallbackForPages = {
 }
 
 export default defineConfig({
-  base: '/DebugLab/',
+  base: '/debuglab/',
   plugins: [react(), tailwindcss(), spaFallbackForPages],
   test: {
     include: ['src/**/*.test.ts'],

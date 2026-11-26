@@ -1,11 +1,11 @@
 // A tiny static server that behaves like GitHub Pages for a project page:
-// files are served from /DebugLab/, and any missing path gets 404.html with status 404.
+// files are served from /debuglab/, and any missing path gets 404.html with status 404.
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 
 const port = Number(process.argv[2] ?? 4321)
-const base = '/DebugLab/'
+const base = '/debuglab/'
 const root = join(import.meta.dirname, '..', 'dist')
 const types = {
   '.html': 'text/html; charset=utf-8',

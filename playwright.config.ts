@@ -9,14 +9,14 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: `http://localhost:${port}/DebugLab/`,
+    baseURL: `http://localhost:${port}/debuglab/`,
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   // Serve the production build the way GitHub Pages does, so deep-link tests are honest.
   webServer: {
     command: `npm run build && node scripts/serve-pages.mjs ${port}`,
-    url: `http://localhost:${port}/DebugLab/`,
+    url: `http://localhost:${port}/debuglab/`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
