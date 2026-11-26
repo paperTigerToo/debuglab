@@ -86,7 +86,7 @@ function IncidentWorkspace({ incident }: { incident: IncidentDefinition }) {
       {!fitsDevice && !openAnyway ? (
         <SmallScreenNotice onOpen={() => setOpenAnyway(true)} />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <Dashboard data={data} />
           <div className="space-y-4">
             <Terminal key={run} incident={incident} state={state} onState={setState} />

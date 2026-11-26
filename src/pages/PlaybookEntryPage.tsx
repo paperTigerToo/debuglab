@@ -19,7 +19,7 @@ function Command({ command }: { command: PlaybookCommand }) {
   return (
     <li className="space-y-2 py-3 first:pt-0 last:pb-0">
       <div className="flex items-start gap-2">
-        <code ref={code} className="min-w-0 flex-1 overflow-x-auto whitespace-pre rounded bg-bg px-2 py-1.5 font-mono text-xs">
+        <code ref={code} className="min-w-0 flex-1 whitespace-pre-wrap rounded bg-bg px-2 py-1.5 font-mono text-xs [overflow-wrap:anywhere]">
           <Annotated text={command.text} />
         </code>
         <CopyButton text={command.text} target={code} />

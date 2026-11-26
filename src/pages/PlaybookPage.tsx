@@ -53,7 +53,7 @@ export function PlaybookPage() {
               </h2>
               <ul className="mt-3 grid gap-3">
                 {entries.map((e) => (
-                  <li key={e.id} className="relative rounded-lg border border-line bg-panel p-4 transition-colors hover:border-accent">
+                  <li key={e.id} className="relative min-w-0 rounded-lg border border-line bg-panel p-4 transition-colors hover:border-accent">
                     <h3 className="font-medium">
                       {/* The link covers the whole card, while terms in the summary stay usable above it. */}
                       <Link to={playbookPath(e.id)} className="after:absolute after:inset-0 hover:text-accent">

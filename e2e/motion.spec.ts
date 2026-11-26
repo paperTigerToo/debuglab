@@ -68,22 +68,24 @@ test.describe('on a phone', () => {
   const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } = devices['Pixel 5']
   test.use({ viewport, userAgent, deviceScaleFactor, isMobile, hasTouch })
 
-  test('the reading pages fit the screen without sideways scrolling', async ({ page }) => {
-    const pages = [
-      './',
-      'concepts',
-      'concepts/investigating-by-hypothesis',
-      'concepts/golden-signals-and-alerting',
-      'concepts/working-safely-in-production',
-      'playbook',
-      'playbook/what-is-the-application-logging',
-      'resources',
-    ]
-    for (const path of pages) {
+  /**
+   * How far the page reaches past the phone's own width. A phone browser zooms a too-wide page out to fit,
+   * which makes window.innerWidth grow with it, so measure against the device width instead.
+   */
+  const overflow = (page: Page) => page.evaluate((phone) => document.documentElement.scrollWidth - phone, viewport.width)
+
+  test('every reading page fits the screen without sideways scrolling', async ({ page }) => {
+    const paths = ['./', 'concepts', 'playbook', 'resources', 'lab']
+    for (const list of ['concepts', 'playbook']) {
+      await page.goto(list)
+      const links = await page.getByRole('main').getByRole('link').evaluateAll((as) => as.map((a) => new URL((a as HTMLAnchorElement).href).pathname))
+      paths.push(...new Set(links.filter((l) => l.includes(`/${list}/`)).map((l) => l.replace(/^\/debuglab\//, ''))))
+    }
+    expect(paths.length).toBeGreaterThan(30)
+    for (const path of paths) {
       await page.goto(path)
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-      expect(overflow, path).toBeLessThanOrEqual(0)
+      expect(await overflow(page), path).toBeLessThanOrEqual(0)
     }
   })
 
@@ -95,5 +97,21 @@ test.describe('on a phone', () => {
     await expect(notice.getByRole('link', { name: 'Read the Concepts' })).toBeVisible()
     await notice.getByRole('button', { name: 'Open it anyway' }).click()
     await expect(page.getByRole('textbox', { name: 'Command' })).toBeVisible()
+  })
+
+  test('an Incident opened anyway still fits the screen, dashboard, terminal and Debrief', async ({ page }) => {
+    for (const id of ['bad-deploy', 'memory-leak', 'slow-query', 'connection-pool-exhaustion', 'full-disk']) {
+      await page.goto(`lab/${id}`)
+      await page.getByRole('button', { name: 'Open it anyway' }).click()
+      await expect(page.getByRole('textbox', { name: 'Command' })).toBeVisible()
+      expect(await overflow(page), id).toBeLessThanOrEqual(0)
+    }
+    await page.getByRole('button', { name: /finish the Incident/ }).click()
+    const form = page.getByRole('form', { name: 'Finish the Incident' })
+    await form.getByRole('radio').first().check()
+    await form.getByRole('radio').last().check()
+    await form.getByRole('button', { name: 'Finish and see the Debrief' }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Debrief')
+    expect(await overflow(page), 'Debrief').toBeLessThanOrEqual(0)
   })
 })

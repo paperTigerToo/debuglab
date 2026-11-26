@@ -41,7 +41,7 @@ export function HintPanel({ hint, onReveal }: { hint: HintView | undefined; onRe
               <div className="animate-rise">
                 <dt className="font-mono text-xs text-muted">Command</dt>
                 <dd>
-                  <code className="block overflow-x-auto rounded bg-bg px-2 py-1 font-mono text-xs">
+                  <code className="block whitespace-pre-wrap rounded bg-bg px-2 py-1 font-mono text-xs [overflow-wrap:anywhere]">
                     <Annotated text={hint.command} />
                   </code>
                 </dd>
