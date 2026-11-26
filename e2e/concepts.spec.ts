@@ -1,8 +1,17 @@
 import { expect, test } from '@playwright/test'
 
-test('the Concepts list leads through all three Concepts in order, then to the Incident Lab', async ({ page }) => {
+test('the Concepts list leads through all eight Concepts in order, then to the Incident Lab', async ({ page }) => {
   await page.goto('concepts')
-  const titles = ['The incident lifecycle', 'Mitigate first, then investigate', 'Investigating by hypothesis']
+  const titles = [
+    'The incident lifecycle',
+    'Mitigate first, then investigate',
+    'Observability: logs, metrics and traces',
+    'Golden signals, SLOs and alerting',
+    'Investigating by hypothesis',
+    'Working safely in production',
+    'Prevention: catching failures before users do',
+    'Blameless postmortems',
+  ]
   await page.getByRole('link', { name: titles[0] }).click()
   for (const [i, title] of titles.entries()) {
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
@@ -53,6 +62,57 @@ test('the hypothesis example rules guesses out by running checks', async ({ page
   await expect(example).toContainText('1 ruled out, 0 supported, 2 left to test.')
 })
 
+test('the observability example asks which signal answers each question', async ({ page }) => {
+  await page.goto('concepts/observability')
+  const example = page.getByRole('region', { name: /Try it/ })
+  const question = example.getByRole('group', { name: 'Why did this checkout fail?' })
+  await question.getByRole('button', { name: 'Metrics' }).click()
+  await expect(question).toContainText('Not quite')
+  await question.getByRole('button', { name: 'Logs' }).click()
+  await expect(question.getByRole('button', { name: 'Logs' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(question).toContainText('Right')
+  await expect(example).toContainText('1 of 4 right')
+})
+
+test('the alerting example shows what a rule would have paged for', async ({ page }) => {
+  await page.goto('concepts/golden-signals-and-alerting')
+  const example = page.getByRole('region', { name: /Try it/ })
+  await example.getByText('above 5%').click()
+  await example.getByText('for 1 minute').click()
+  await expect(example).toContainText('2 pages')
+  await expect(example).toContainText('false page')
+  await example.getByText('for 5 minutes').click()
+  await expect(example.getByRole('radio', { name: 'for 5 minutes' })).toBeChecked()
+  await expect(example).toContainText('1 page')
+  await expect(example.getByRole('img', { name: /error rate/i })).toBeVisible()
+})
+
+test('the working-safely example sorts commands by what they can break', async ({ page }) => {
+  await page.goto('concepts/working-safely-in-production')
+  const example = page.getByRole('region', { name: /Try it/ })
+  const item = example.getByRole('group', { name: /EXPLAIN ANALYZE DELETE/ })
+  await item.getByRole('button', { name: 'Only reads' }).click()
+  await expect(item).toContainText('really runs')
+  await item.getByRole('button', { name: 'Destroys data' }).click()
+  await expect(item).toContainText('Right')
+})
+
+test('the prevention example matches each Incident with the safeguard that would have caught it', async ({ page }) => {
+  await page.goto('concepts/prevention')
+  const example = page.getByRole('region', { name: /Try it/ })
+  const badDeploy = example.getByRole('group', { name: 'Bad Deploy' })
+  await badDeploy.getByRole('button', { name: 'Canary release' }).click()
+  await expect(badDeploy).toContainText('synthetic checkout')
+})
+
+test('the postmortem example turns blame into a finding about the system', async ({ page }) => {
+  await page.goto('concepts/blameless-postmortems')
+  const example = page.getByRole('region', { name: /Try it/ })
+  const sentence = example.getByRole('group', { name: /forgot to turn debug logging off/ })
+  await sentence.getByRole('button', { name: 'Blames a person' }).click()
+  await expect(sentence).toContainText('no owner or end time')
+})
+
 test('an unknown Concept address shows not found', async ({ page }) => {
   await page.goto('concepts/no-such-concept')
   await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible()
@@ -64,6 +124,6 @@ test('Resources are grouped by subject, each with a reason to read it', async ({
     await expect(page.getByRole('heading', { level: 2, name: subject })).toBeVisible()
   }
   const kubernetes = page.getByRole('region', { name: 'Kubernetes' })
-  await expect(kubernetes.getByRole('listitem')).toHaveCount(9)
+  await expect(kubernetes.getByRole('listitem')).toHaveCount(12)
   await expect(kubernetes).toContainText('why they disappear with the pod')
 })

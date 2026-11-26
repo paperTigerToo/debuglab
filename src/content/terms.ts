@@ -103,7 +103,7 @@ export const terms: readonly Term[] = [
   },
   {
     id: 'postmortem',
-    concept: 'incident-lifecycle',
+    concept: 'blameless-postmortems',
     matches: ['postmortem'],
     explanation: 'A written review after an Incident: what happened, why, and what will change. Blameless: it studies the system, not people.',
   },
@@ -324,6 +324,7 @@ export const terms: readonly Term[] = [
   { id: 'latency', matches: ['Latency', 'latency'], explanation: 'How long a request takes from arriving to being answered.' },
   {
     id: 'saturation',
+    concept: 'golden-signals-and-alerting',
     matches: ['Saturation', 'saturation'],
     explanation: 'How full a resource is, such as CPU against its limit. Near 100% means work starts to queue.',
   },
@@ -331,6 +332,7 @@ export const terms: readonly Term[] = [
   { id: 'error-rate', matches: ['Error rate'], explanation: 'The share of requests that failed, usually those answered with a 5xx.' },
   {
     id: 'golden-signals',
+    concept: 'golden-signals-and-alerting',
     matches: ['golden signals', 'Golden signals'],
     explanation: 'Traffic, errors, latency and saturation: the four measurements that describe most services\' health.',
   },
@@ -484,5 +486,41 @@ export const terms: readonly Term[] = [
     matches: ['ALTER SYSTEM', 'postgresql.auto.conf'],
     explanation: 'Changes a PostgreSQL setting from SQL, saved in postgresql.auto.conf in the data directory, where no manifest shows it.',
   },
-  { id: 'canary', matches: ['canary'], explanation: 'Sending a small share of traffic to a new version first, so a bad release harms few people.' },
+  {
+    id: 'slo',
+    concept: 'golden-signals-and-alerting',
+    matches: ['SLO', 'SLOs', 'service level objective'],
+    explanation: 'A target for how well a service must work, such as 99.9% of requests succeeding over 30 days.',
+  },
+  {
+    id: 'error-budget',
+    concept: 'golden-signals-and-alerting',
+    matches: ['error budget'],
+    explanation: 'What an objective leaves over: at 99.9% over 30 days, about 43 minutes of complete outage. Incidents spend it.',
+  },
+  {
+    id: 'observability',
+    concept: 'observability',
+    matches: ['observability', 'Observability'],
+    explanation: 'How well you can tell what a system is doing from what it emits: its logs, metrics and traces.',
+  },
+  {
+    id: 'trace',
+    concept: 'observability',
+    matches: ['traces', 'a trace', 'A trace'],
+    explanation: 'The path of one request through every service it touches, with the time spent in each step.',
+  },
+  {
+    id: 'feature-flag',
+    concept: 'prevention',
+    matches: ['feature flag', 'feature flags'],
+    explanation: 'A switch that turns code on or off for some or all users without a release.',
+  },
+  {
+    id: 'blast-radius',
+    concept: 'working-safely-in-production',
+    matches: ['blast radius'],
+    explanation: 'How much a change can break if it goes wrong: one pod, one Deployment, or the whole site.',
+  },
+  { id: 'canary', concept: 'prevention', matches: ['canary'], explanation: 'Sending a small share of traffic to a new version first, so a bad release harms few people.' },
 ]

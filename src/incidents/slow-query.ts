@@ -754,7 +754,7 @@ redis-7c9d5b8f6         1         1         1       222d`,
     'Keep the slow query log on (log_min_duration_statement). Here it named the guilty query in the first minute of the investigation.',
   ],
   links: {
-    concepts: ['investigating-by-hypothesis', 'mitigate-then-investigate'],
+    concepts: ['investigating-by-hypothesis', 'golden-signals-and-alerting', 'working-safely-in-production', 'prevention'],
     resources: ['pg-monitoring-stats', 'pg-using-explain', 'pg-create-index', 'pg-logging', 'gregg-methodology'],
   },
 })

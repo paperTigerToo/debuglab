@@ -722,7 +722,7 @@ REVISION  CHANGE-CAUSE
     'Watch saturation of every finite resource, not only CPU. The pool was at 100% while every CPU graph looked calm.',
   ],
   links: {
-    concepts: ['investigating-by-hypothesis', 'mitigate-then-investigate'],
+    concepts: ['investigating-by-hypothesis', 'observability', 'golden-signals-and-alerting', 'prevention'],
     resources: ['sre-cascading-failures', 'fowler-circuit-breaker', 'node-postgres-pool', 'pg-client-config', 'kubectl-set-env'],
   },
 })

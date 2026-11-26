@@ -15,3 +15,4 @@
 
 - From tickets 13 and 14: the ten new Resource links answered 200 on 2026-11-25; check them again here.
 - From the review of ticket 16: each Incident still declares its own `Pod` type, in four different shapes (some with age, CPU or memory per state). Unify them in build.ts if the release pass touches them; nothing breaks if left. A new kube resource type needs both `kubeResourceTypes` and, when its plural is irregular, `notFoundKind` in the engine.
+- From the review of ticket 17: "safeguard" is used in the prevention example but is not in GLOSSARY.md. The quiz examples use toggle buttons (aria-pressed) for a pick-one choice, where MitigateFirstExample uses a radio group; both are accessible, but one pattern would be more consistent. The radio-label styling is repeated in MitigateFirstExample and AlertingExample. On a phone the alert chart's labels are small; the text summary beneath it carries the same information.

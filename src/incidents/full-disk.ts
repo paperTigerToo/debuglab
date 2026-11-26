@@ -788,7 +788,7 @@ REVISION  CHANGE-CAUSE
     'Know what in a database directory must never be deleted. pg_wal sounds like logs and is not; the logs live in log.',
   ],
   links: {
-    concepts: ['investigating-by-hypothesis', 'mitigate-then-investigate'],
+    concepts: ['golden-signals-and-alerting', 'working-safely-in-production', 'prevention', 'blameless-postmortems'],
     resources: ['gregg-use-method', 'pg-logging', 'pg-wal-intro', 'pg-alter-system', 'k8s-persistent-volumes'],
   },
 })

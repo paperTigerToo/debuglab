@@ -69,7 +69,17 @@ test.describe('on a phone', () => {
   test.use({ viewport, userAgent, deviceScaleFactor, isMobile, hasTouch })
 
   test('the reading pages fit the screen without sideways scrolling', async ({ page }) => {
-    for (const path of ['./', 'concepts', 'concepts/investigating-by-hypothesis', 'playbook', 'playbook/what-is-the-application-logging', 'resources']) {
+    const pages = [
+      './',
+      'concepts',
+      'concepts/investigating-by-hypothesis',
+      'concepts/golden-signals-and-alerting',
+      'concepts/working-safely-in-production',
+      'playbook',
+      'playbook/what-is-the-application-logging',
+      'resources',
+    ]
+    for (const path of pages) {
       await page.goto(path)
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)

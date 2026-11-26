@@ -1,7 +1,12 @@
 import { Link, useParams } from 'react-router'
+import { AlertingExample } from '../concepts/AlertingExample'
 import { HypothesisExample } from '../concepts/HypothesisExample'
 import { LifecycleExample } from '../concepts/LifecycleExample'
 import { MitigateFirstExample } from '../concepts/MitigateFirstExample'
+import { ObservabilityExample } from '../concepts/ObservabilityExample'
+import { PostmortemExample } from '../concepts/PostmortemExample'
+import { PreventionExample } from '../concepts/PreventionExample'
+import { WorkingSafelyExample } from '../concepts/WorkingSafelyExample'
 import { citedResourceIds, concepts, type Concept } from '../content/concepts'
 import { resourceById } from '../content/resources'
 import { incidents } from '../incidents'
@@ -14,6 +19,11 @@ const examples: Record<Concept['example'], () => React.JSX.Element> = {
   lifecycle: LifecycleExample,
   'mitigate-first': MitigateFirstExample,
   hypothesis: HypothesisExample,
+  observability: ObservabilityExample,
+  alerting: AlertingExample,
+  'working-safely': WorkingSafelyExample,
+  prevention: PreventionExample,
+  postmortem: PostmortemExample,
 }
 
 export function ConceptPage() {

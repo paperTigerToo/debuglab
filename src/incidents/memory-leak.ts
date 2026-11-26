@@ -1065,7 +1065,7 @@ HOME=/root`),
     'Run a new release under real traffic for long enough to see slow trends. This leak took a night and a morning to kill anything.',
   ],
   links: {
-    concepts: ['mitigate-then-investigate', 'investigating-by-hypothesis'],
+    concepts: ['mitigate-then-investigate', 'observability', 'golden-signals-and-alerting', 'prevention'],
     resources: ['k8s-assign-memory', 'nodejs-memory-diagnostics', 'gregg-memory-leaks', 'sre-troubleshooting'],
   },
 })
