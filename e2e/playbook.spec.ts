@@ -2,18 +2,18 @@ import { expect, test } from '@playwright/test'
 
 test('the Playbook groups its Entries by layer, showing only layers that have some', async ({ page }) => {
   await page.goto('playbook')
-  for (const layer of ['Cluster', 'Container', 'Database', 'Application']) {
+  for (const layer of ['Cluster', 'Container', 'Network', 'Database', 'Application']) {
     await expect(page.getByRole('heading', { level: 2, name: layer })).toBeVisible()
   }
-  await expect(page.getByRole('heading', { level: 2, name: 'Network' })).toHaveCount(0)
-  await expect(page.getByRole('region', { name: 'Cluster' }).getByRole('link')).toHaveCount(3)
+  await expect(page.getByRole('heading', { level: 2, name: 'Host' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Cluster' }).getByRole('link')).toHaveCount(4)
   await expect(page.getByRole('region', { name: 'Database' }).getByRole('link')).toHaveCount(4)
 })
 
 test('searching by command finds the Entry, and opening it shows its parts', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto('playbook')
-  await page.getByRole('searchbox', { name: 'Search the Playbook' }).fill('rollout undo')
+  await page.getByRole('searchbox', { name: 'Search the Playbook' }).fill('rollout undo deployment/pantry-api --to-revision')
   const results = page.getByRole('main').getByRole('link')
   await expect(results).toHaveCount(1)
   await results.first().click()
@@ -39,7 +39,7 @@ test('searching by question or by another spelling of a term finds the Entry', a
   await expect(page.getByRole('main').getByRole('link')).toHaveText(['How do I keep the Evidence before changing anything?'])
   // printenv is another name for env, which the configuration Entry uses.
   await search.fill('printenv')
-  await expect(page.getByRole('main').getByRole('link')).toHaveText(['What configuration is a container running with?'])
+  await expect(page.getByRole('main').getByRole('link', { name: 'What configuration is a container running with?' })).toBeVisible()
   await search.fill('nothing matches this')
   await expect(page.getByRole('main')).toContainText('No Playbook Entry matches')
 })

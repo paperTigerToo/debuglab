@@ -2,6 +2,7 @@
 import { expect, test } from 'vitest'
 import { currentHint, dashboard, start, step } from '../engine/engine'
 import type { IncidentDefinition, SessionState } from '../engine/types'
+import { connectionPool } from './connection-pool'
 import { memoryLeak } from './memory-leak'
 import { slowQuery } from './slow-query'
 
@@ -47,4 +48,13 @@ test('Slow Query: an investigation that rolls back before rebuilding the index h
   const { state } = play(slowQuery, ...investigate, 'kubectl rollout undo deployment/pantry-api', 'y', rebuild, 'y')
   expect(state.namedState).toBe('rolled-back-indexed')
   expect(currentHint(slowQuery, state)).toBeUndefined()
+})
+
+test('Connection Pool Exhaustion: a restart frees the pool only until slow checkouts fill it again', () => {
+  const restarted = play(connectionPool, 'kubectl rollout restart deployment/pantry-api', 'y')
+  expect(dashboard(connectionPool, restarted.state).alert.status).toBe('firing')
+  expect(restarted.text).toContain('pools fill up again')
+  const mitigated = step(connectionPool, restarted.state, { kind: 'command', text: 'kubectl set env deploy/pantry-api PAYMENTS_TIMEOUT_MS=2000' })
+  const confirmed = step(connectionPool, mitigated.state, { kind: 'command', text: 'y' }).state
+  expect(dashboard(connectionPool, confirmed).alert.status).toBe('resolved')
 })

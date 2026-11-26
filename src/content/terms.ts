@@ -414,5 +414,47 @@ export const terms: readonly Term[] = [
     matches: ['log_min_duration_statement'],
     explanation: 'A PostgreSQL setting: log every statement slower than this, with how long it took. It turns on the slow query log.',
   },
+  {
+    id: 'payments-timeout',
+    matches: ['PAYMENTS_TIMEOUT_MS'],
+    explanation: 'How long pantry-api waits for the payments service before giving up, in milliseconds.',
+  },
+  {
+    id: 'pool-settings',
+    matches: ['DB_POOL_SIZE', 'DB_POOL_ACQUIRE_TIMEOUT_MS'],
+    explanation: 'The number of database connections in pantry-api’s pool, and how long a request waits for a free one before failing.',
+  },
+  {
+    id: 'checkout-enabled',
+    matches: ['CHECKOUT_ENABLED'],
+    explanation: 'A feature flag: set it to false to switch checkout off without a release, while the rest of the site keeps working.',
+  },
+  {
+    id: 'circuit-breaker',
+    matches: ['circuit breaker'],
+    explanation: 'Stops calling a dependency that keeps failing or timing out, for a while, so callers fail fast instead of waiting on it.',
+  },
+  {
+    id: 'kubectl-set-env',
+    playbook: 'how-do-i-change-a-setting-without-a-release',
+    matches: ['kubectl set env', 'set env'],
+    explanation: 'Changes an environment variable on a Deployment. Kubernetes rolls out new pods to apply it.',
+  },
+  {
+    id: 'idle-in-transaction',
+    playbook: 'what-is-the-database-doing-right-now',
+    matches: ['idle in transaction'],
+    explanation: 'A connection inside an open transaction that is not running anything: the client is busy elsewhere, still holding it.',
+  },
+  {
+    id: 'xact-start',
+    matches: ['xact_start'],
+    explanation: 'When the connection’s current transaction began. now() - xact_start is how long it has been open.',
+  },
+  {
+    id: 'max-connections',
+    matches: ['max_connections'],
+    explanation: 'The most connections PostgreSQL accepts at once. Past it, every new connection is refused, from any client.',
+  },
   { id: 'canary', matches: ['canary'], explanation: 'Sending a small share of traffic to a new version first, so a bad release harms few people.' },
 ]

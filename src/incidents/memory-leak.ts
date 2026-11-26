@@ -1,6 +1,6 @@
 import type { AccessLogLine, Dashboard, Deploy } from '../engine/types'
 import { defineIncident } from '../engine/types'
-import { access, clock, pad, round, unavailable503, wobble } from './build'
+import { access, appLog, clock, pad, podsTable, round, topTable, unavailable503, wobble, type PodRow } from './build'
 
 // Memory Leak: release v2.15.0 of pantry-api, out since yesterday evening, added an in-memory cache
 // for product search results. It has no size limit or expiry and its key includes the shopper's
@@ -77,29 +77,28 @@ const leakingPods: Pod[] = [
 ]
 
 // `kubectl rollout restart` stamps the pod template, so the restarted pods have a new ReplicaSet and new names.
+// Both sets start about 74 seconds before the Learner looks, one pod after another as the rollout proceeds.
 const restartedPods = [
-  { pod: 'pantry-api-6b8d9c4f72-hm4qx', node: 'node-a', ip: '10.42.0.61', memory: '163Mi', cpu: '88m' },
-  { pod: 'pantry-api-6b8d9c4f72-r7wn5', node: 'node-b', ip: '10.42.1.70', memory: '158Mi', cpu: '93m' },
-  { pod: 'pantry-api-6b8d9c4f72-zc2jt', node: 'node-c', ip: '10.42.2.51', memory: '151Mi', cpu: '85m' },
+  { pod: 'pantry-api-6b8d9c4f72-hm4qx', node: 'node-a', ip: '10.42.0.61', memory: '163Mi', cpu: '88m', age: '74s' },
+  { pod: 'pantry-api-6b8d9c4f72-r7wn5', node: 'node-b', ip: '10.42.1.70', memory: '158Mi', cpu: '93m', age: '52s' },
+  { pod: 'pantry-api-6b8d9c4f72-zc2jt', node: 'node-c', ip: '10.42.2.51', memory: '151Mi', cpu: '85m', age: '31s' },
 ]
 const rolledBackPods = [
-  { pod: 'pantry-api-5c8d9f7b46-b4xpl', node: 'node-a', ip: '10.42.0.62', memory: '139Mi', cpu: '79m' },
-  { pod: 'pantry-api-5c8d9f7b46-g8kzs', node: 'node-b', ip: '10.42.1.71', memory: '142Mi', cpu: '84m' },
-  { pod: 'pantry-api-5c8d9f7b46-w2nfd', node: 'node-c', ip: '10.42.2.52', memory: '136Mi', cpu: '77m' },
+  { pod: 'pantry-api-5c8d9f7b46-b4xpl', node: 'node-a', ip: '10.42.0.62', memory: '139Mi', cpu: '79m', age: '74s' },
+  { pod: 'pantry-api-5c8d9f7b46-g8kzs', node: 'node-b', ip: '10.42.1.71', memory: '142Mi', cpu: '84m', age: '52s' },
+  { pod: 'pantry-api-5c8d9f7b46-w2nfd', node: 'node-c', ip: '10.42.2.52', memory: '136Mi', cpu: '77m', age: '31s' },
 ]
 const LEAKING_RS = 'pantry-api-7f9c6d5b48'
 const RESTARTED_RS = 'pantry-api-6b8d9c4f72'
 const ROLLED_BACK_RS = 'pantry-api-5c8d9f7b46'
 
-type Row = { pod: string; ready: string; status: string; restarts: string; age: string; ip: string; node: string }
-
-const datastoreRows: Row[] = [
-  { pod: 'postgres-0', ready: '1/1', status: 'Running', restarts: '0', age: '46d', ip: '10.42.0.12', node: 'node-a' },
-  { pod: 'redis-7c9d5b8f6-hq2lw', ready: '1/1', status: 'Running', restarts: '0', age: '46d', ip: '10.42.2.7', node: 'node-c' },
+const datastoreRows: PodRow[] = [
+  { name: 'postgres-0', ready: '1/1', status: 'Running', restarts: '0', age: '46d', ip: '10.42.0.12', node: 'node-a' },
+  { name: 'redis-7c9d5b8f6-hq2lw', ready: '1/1', status: 'Running', restarts: '0', age: '46d', ip: '10.42.2.7', node: 'node-c' },
 ]
 
-const leakingRows: Row[] = leakingPods.map((p) => ({
-  pod: p.pod,
+const leakingRows: PodRow[] = leakingPods.map((p) => ({
+  name: p.pod,
   ready: '1/1',
   status: 'Running',
   restarts: `${p.restarts} (${p.lastRestart})`,
@@ -107,34 +106,18 @@ const leakingRows: Row[] = leakingPods.map((p) => ({
   ip: p.ip,
   node: p.node,
 }))
-const freshRows = (pods: typeof restartedPods): Row[] =>
-  pods.map((p, i) => ({ pod: p.pod, ready: '1/1', status: 'Running', restarts: '0', age: ['74s', '52s', '31s'][i]!, ip: p.ip, node: p.node }))
+const freshRows = (pods: typeof restartedPods): PodRow[] =>
+  pods.map((p) => ({ name: p.pod, ready: '1/1', status: 'Running', restarts: '0', age: p.age, ip: p.ip, node: p.node }))
 
-function getPods(api: Row[]): string {
-  const rows = [...api, ...datastoreRows].map(
-    (r) => `${pad(r.pod, 30)}${pad(r.ready, 8)}${pad(r.status, 10)}${pad(r.restarts, 13)}${r.age}`,
-  )
-  return [`${pad('NAME', 30)}READY   STATUS    RESTARTS     AGE`, ...rows].join('\n')
-}
+const getPods = (api: PodRow[]) => podsTable([...api, ...datastoreRows])
+const getPodsWide = (api: PodRow[]) => podsTable([...api, ...datastoreRows], true)
 
-function getPodsWide(api: Row[]): string {
-  const rows = [...api, ...datastoreRows].map(
-    (r) =>
-      `${pad(r.pod, 30)}${pad(r.ready, 8)}${pad(r.status, 10)}${pad(r.restarts, 13)}${pad(r.age, 6)}${pad(r.ip, 14)}${pad(r.node, 9)}<none>           <none>`,
-  )
-  return [`${pad('NAME', 30)}READY   STATUS    RESTARTS     AGE   IP            NODE     NOMINATED NODE   READINESS GATES`, ...rows].join(
-    '\n',
-  )
-}
-
-function topPods(api: { pod: string; cpu: string; memory: string }[]): string {
-  const rows = [
-    ...api.map((p) => `${pad(p.pod, 30)}${pad(p.cpu, 13)}${p.memory}`),
-    `${pad('postgres-0', 30)}${pad('131m', 13)}502Mi`,
-    `${pad('redis-7c9d5b8f6-hq2lw', 30)}${pad('11m', 13)}41Mi`,
-  ]
-  return [`${pad('NAME', 30)}CPU(cores)   MEMORY(bytes)`, ...rows].join('\n')
-}
+const topPods = (api: { pod: string; cpu: string; memory: string }[]) =>
+  topTable([
+    ...api.map((p) => ({ name: p.pod, cpu: p.cpu, memory: p.memory })),
+    { name: 'postgres-0', cpu: '131m', memory: '502Mi' },
+    { name: 'redis-7c9d5b8f6-hq2lw', cpu: '11m', memory: '41Mi' },
+  ])
 
 // ---------------------------------------------------------------------------------------------
 // Inside pantry-api
@@ -254,19 +237,15 @@ NewReplicaSet:   ${o.newRs} (3/3 replicas created)`
 const v215Cause = 'release v2.15.0: cache product search results'
 
 // Application logs. A container's log starts when that container starts, so each restart begins a new one.
-const info = (time: string, msg: string, extra = '') =>
-  `{"level":"info","time":"2026-11-19T${time}Z","pid":1,"msg":"${msg}"${extra}}`
-const request = (time: string, method: string, path: string, ms: number, status = 200) =>
-  info(time, 'request completed', `,"method":"${method}","path":"${path}","status":${status},"ms":${ms}`)
-const slowRequest = (time: string, path: string, ms: number) =>
-  `{"level":"warn","time":"2026-11-19T${time}Z","pid":1,"msg":"slow request","method":"GET","path":"${path}","ms":${ms}}`
+const { line, request } = appLog('2026-11-19')
+const slowRequest = (time: string, path: string, ms: number) => line(time, 'warn', 'slow request', { method: 'GET', path, ms })
 
 const startup = (time: string, version: string, cache: boolean) =>
   [
-    info(time, `pantry-api ${version} starting`, ',"node":"v22.11.0"'),
-    ...(cache ? [info(time.replace(/\d{3}$/, '431'), 'search cache enabled', ',"cache":"memory"')] : []),
-    info(time.replace(/\d{3}$/, '502'), 'connected to postgres', ',"pool":10'),
-    info(time.replace(/\d{3}$/, '517'), 'listening', ',"port":8080'),
+    line(time, 'info', `pantry-api ${version} starting`, { node: 'v22.11.0' }),
+    ...(cache ? [line(time.replace(/\d{3}$/, '431'), 'info', 'search cache enabled', { cache: 'memory' })] : []),
+    line(time.replace(/\d{3}$/, '502'), 'info', 'connected to postgres', { pool: 10 }),
+    line(time.replace(/\d{3}$/, '517'), 'info', 'listening', { port: 8080 }),
   ].join('\n')
 
 function currentLogs(startedAt: string, minute: string): string {

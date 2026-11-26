@@ -799,6 +799,162 @@ export const playbook: readonly PlaybookEntry[] = [
     ],
     links: { concepts: ['mitigate-then-investigate'], resources: ['pg-create-index'] },
   },
+  {
+    id: 'is-the-service-waiting-for-database-connections',
+    question: 'Is the service waiting for database connections?',
+    layer: 'Application',
+    summary:
+      'A service keeps a small pool of database connections. When every one is taken, requests queue for one and time out, while CPU everywhere looks calm.',
+    commands: [
+      {
+        text: 'kubectl logs deployment/pantry-api --tail=20',
+        effect: 'read-only',
+        what: 'The latest log lines. A full pool shows as requests giving up while they wait for a connection.',
+      },
+      {
+        text: 'kubectl logs deployment/pantry-api | grep -c "waiting for a database connection"',
+        effect: 'read-only',
+        what: 'Counts those timeouts in the log, to tell a burst from a steady state.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "SELECT state, count(*) FROM pg_stat_activity GROUP BY state"',
+        effect: 'read-only',
+        what: 'The other side of the pool: how many connections PostgreSQL has, and what state each is in.',
+      },
+    ],
+    healthy: {
+      label: 'Connections to spare',
+      output: table(
+        '{"level":"info","msg":"request completed","method":"GET","path":"/api/cart","status":200,"ms":11}',
+        '{"level":"info","msg":"request completed","method":"GET","path":"/api/products/4411","status":200,"ms":9}',
+      ),
+      notes: [{ mark: '"ms":11', note: 'Requests that need the database finish in milliseconds: they got a connection at once.' }],
+    },
+    unhealthy: {
+      label: 'Pool exhausted',
+      output: table(
+        '{"level":"error","msg":"timed out waiting for a database connection","waitMs":5000,"pool":{"size":10,"inUse":10,"idle":0,"waiting":37}}',
+        '{"level":"info","msg":"request completed","method":"GET","path":"/api/cart","status":503,"ms":5003}',
+      ),
+      notes: [
+        { mark: '"inUse":10', note: 'All ten connections are taken, and none is idle.' },
+        { mark: '"waiting":37', note: '37 requests are queued for a connection.' },
+        { mark: '"ms":5003', note: 'The request gave up after the 5-second wait and answered 503, though nothing failed in the database.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'The pool is full but the database is idle',
+        then: 'The connections are held, not used. See what they are doing: [What is the database doing right now?](playbook:what-is-the-database-doing-right-now)',
+      },
+      {
+        if: 'The pool is full and the database is busy',
+        then: 'Queries are slow, so connections come back late: [Which queries are slow?](playbook:which-queries-are-slow)',
+      },
+      {
+        if: 'Nothing is waiting for a connection',
+        then: 'The time goes somewhere else. Check the services it calls: [Is a dependency slow?](playbook:is-a-dependency-slow)',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['node-postgres-pool', 'sre-cascading-failures'] },
+  },
+  {
+    id: 'is-a-dependency-slow',
+    question: 'Is a dependency slow?',
+    layer: 'Network',
+    summary:
+      'A service is only as fast as the slowest thing it waits for. A dependency that slows down can stall the caller, even when the caller is healthy.',
+    commands: [
+      {
+        text: 'kubectl logs deployment/pantry-api | grep payments',
+        effect: 'read-only',
+        what: 'What the service logged about its calls to one dependency: slow calls, timeouts, errors.',
+      },
+      {
+        text: 'kubectl exec pantry-api-8c5d7f9b64-jx2mq -- curl -s -o /dev/null -w "%{time_total}\\n" http://payments.payments.svc.cluster.local/healthz',
+        effect: 'read-only',
+        what: 'Times one request to the dependency from inside a pod, as the service sees it. A fast health check does not prove the real calls are fast.',
+      },
+      {
+        text: 'kubectl describe deployment pantry-api',
+        effect: 'read-only',
+        what: 'Shows the timeouts the service is configured with, to compare with how slow the dependency is.',
+      },
+    ],
+    healthy: {
+      label: 'Fast',
+      output: table('{"level":"info","msg":"payments request completed","orderId":880102,"ms":211}'),
+      notes: [{ mark: '"ms":211', note: 'A charge takes about a fifth of a second.' }],
+    },
+    unhealthy: {
+      label: 'Slow, and waited for',
+      output: table(
+        '{"level":"warn","msg":"payments request slow","orderId":880412,"ms":19840}',
+        '{"level":"info","msg":"request completed","method":"POST","path":"/api/checkout","status":200,"ms":19871}',
+      ),
+      notes: [
+        { mark: '"ms":19840', note: 'Twenty seconds for a charge that normally takes 200 milliseconds.' },
+        { mark: '"status":200', note: 'It still succeeds. Slow is worse than down here: the caller waits instead of failing fast.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'The dependency is slow and the caller waits a long time for it',
+        then: 'Make the caller give up sooner, so it stops tying up its own resources: [How do I change a setting without a release?](playbook:how-do-i-change-a-setting-without-a-release)',
+      },
+      {
+        if: 'The dependency is fast',
+        then: 'Look inside the service instead: [Is the service waiting for database connections?](playbook:is-the-service-waiting-for-database-connections)',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['sre-cascading-failures', 'fowler-circuit-breaker'] },
+  },
+  {
+    id: 'how-do-i-change-a-setting-without-a-release',
+    question: 'How do I change a setting without a release?',
+    layer: 'Cluster',
+    summary:
+      'Many Mitigations are a setting: a timeout, a feature flag, a pool size. Changing it on the Deployment rolls out new pods with the new value, without building a new version.',
+    commands: [
+      {
+        text: 'kubectl set env deployment/pantry-api PAYMENTS_TIMEOUT_MS=2000',
+        effect: 'mutating',
+        what: 'Sets an environment variable on the pod template. Kubernetes rolls out new pods to apply it, replacing the old ones.',
+      },
+      { text: 'kubectl rollout status deployment/pantry-api', effect: 'read-only', what: 'Waits until every new pod is running and Ready.' },
+      {
+        text: 'kubectl rollout undo deployment/pantry-api',
+        effect: 'mutating',
+        what: 'Puts the previous pod template back, setting included, if the change made things worse.',
+      },
+    ],
+    healthy: {
+      label: 'Rolled out',
+      output: table('deployment.apps/pantry-api env updated', 'deployment "pantry-api" successfully rolled out'),
+      notes: [{ mark: 'successfully rolled out', note: 'Every pod now runs with the new setting.' }],
+    },
+    unhealthy: {
+      label: 'Forgotten',
+      output: table('    Environment:', '      PAYMENTS_TIMEOUT_MS:  2000'),
+      notes: [
+        {
+          mark: 'PAYMENTS_TIMEOUT_MS:  2000',
+          note: 'The cluster now differs from the manifest in source control. The next deploy puts the old value back unless the change is copied there too.',
+        },
+      ],
+    },
+    followOn: [
+      {
+        if: 'The harm has stopped',
+        then: 'Record the change where the manifest lives, then find out why the old value hurt: [Is a dependency slow?](playbook:is-a-dependency-slow)',
+      },
+      {
+        if: 'The new pods are not becoming Ready',
+        then: 'The setting may be wrong. Undo it, then read why: [Why does this container keep restarting?](playbook:why-does-this-container-keep-restarting)',
+      },
+    ],
+    links: { concepts: ['mitigate-then-investigate'], resources: ['kubectl-set-env'] },
+  },
 ]
 
 export const entryById = (id: string) => playbook.find((e) => e.id === id)

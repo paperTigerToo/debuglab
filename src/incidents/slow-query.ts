@@ -1,6 +1,6 @@
 import type { AccessLogLine, Dashboard, Deploy } from '../engine/types'
 import { defineIncident } from '../engine/types'
-import { access, clock, pad, round, wobble } from './build'
+import { access, appLog, clock, pad, podsTable, round, runningPod, samples, topTable, wobble } from './build'
 
 // Slow Query: release v2.16.0 of pantry-api ran migration 0042, which dropped indexes a cleanup
 // script had listed as unused. One of them, orders_customer_id_idx, serves the order-history lookup
@@ -28,23 +28,20 @@ const rolledBackPods = [
   { pod: 'pantry-api-6f8b7d9c55-s4bfz', node: 'node-c', ip: '10.42.2.69' },
 ]
 
-function getPods(api: { pod: string }[], age: string): string {
-  const rows = [
-    ...api.map((p) => `${pad(p.pod, 30)}1/1     Running   0          ${age}`),
-    `${pad('postgres-0', 30)}1/1     Running   0          51d`,
-    `${pad('redis-7c9d5b8f6-hq2lw', 30)}1/1     Running   0          51d`,
-  ]
-  return [`${pad('NAME', 30)}READY   STATUS    RESTARTS   AGE`, ...rows].join('\n')
-}
+const getPods = (api: { pod: string; ip: string; node: string }[], age: string) =>
+  podsTable([
+    ...api.map((p) => runningPod(p, age)),
+    runningPod({ pod: 'postgres-0', ip: '10.42.0.12', node: 'node-a' }, '51d'),
+    runningPod({ pod: 'redis-7c9d5b8f6-hq2lw', ip: '10.42.2.7', node: 'node-c' }, '51d'),
+  ])
 
-function topPods(api: { pod: string }[], o: { apiCpu: string[]; dbCpu: string; dbMemory: string }): string {
-  const rows = [
-    ...api.map((p, i) => `${pad(p.pod, 30)}${pad(o.apiCpu[i]!, 13)}${['152Mi', '149Mi', '155Mi'][i]}`),
-    `${pad('postgres-0', 30)}${pad(o.dbCpu, 13)}${o.dbMemory}`,
-    `${pad('redis-7c9d5b8f6-hq2lw', 30)}${pad('12m', 13)}41Mi`,
-  ]
-  return [`${pad('NAME', 30)}CPU(cores)   MEMORY(bytes)`, ...rows].join('\n')
-}
+/** `kubectl top pods`: the API pods' CPU in pod order, and PostgreSQL's CPU and memory. */
+const topPods = (api: { pod: string }[], o: { apiCpu: string[]; dbCpu: string; dbMemory: string }) =>
+  topTable([
+    ...api.map((p, i) => ({ name: p.pod, cpu: o.apiCpu[i]!, memory: ['152Mi', '149Mi', '155Mi'][i]! })),
+    { name: 'postgres-0', cpu: o.dbCpu, memory: o.dbMemory },
+    { name: 'redis-7c9d5b8f6-hq2lw', cpu: '12m', memory: '41Mi' },
+  ])
 
 const describePostgres = `Name:             postgres-0
 Namespace:        pantry
@@ -191,12 +188,8 @@ const indexScanPlan = `                                                         
  Planning Time: 0.131 ms
  Execution Time: 0.093 ms
 (8 rows)`
-
-/** A statement as people type it: with or without a closing semicolon, in capitals or not. */
-const sqlSpellings = (sql: string) => [sql, `${sql};`, sql.toLowerCase(), `${sql.toLowerCase()};`]
-/** Running a statement with psql, as the pantry role, with or without naming the database. */
-const psql = (sql: string) =>
-  sqlSpellings(sql).flatMap((s) => [`psql -U pantry -c "${s}"`, `psql -U pantry -d pantry -c "${s}"`])
+/** Running one statement with psql as the pantry role. The engine forgives case, spacing and a closing semicolon. */
+const psql = (sql: string) => [`psql -U pantry -c "${sql}"`]
 
 const CREATE_INDEX = 'CREATE INDEX CONCURRENTLY orders_customer_id_idx ON orders (customer_id)'
 const CREATE_INDEX_LOCKING = 'CREATE INDEX orders_customer_id_idx ON orders (customer_id)'
@@ -204,27 +197,24 @@ const CREATE_INDEX_LOCKING = 'CREATE INDEX orders_customer_id_idx ON orders (cus
 // ---------------------------------------------------------------------------------------------
 // pantry-api
 
-const apiLine = (time: string, level: string, msg: string, extra: string) =>
-  `{"level":"${level}","time":"2026-11-24T${time}Z","pid":1,"msg":"${msg}"${extra}}`
-const request = (time: string, method: string, path: string, ms: number, status = 200) =>
-  apiLine(time, 'info', 'request completed', `,"method":"${method}","path":"${path}","status":${status},"ms":${ms}`)
-const poolWait = (time: string, ms: number) => apiLine(time, 'warn', 'waiting for a database connection', `,"waitMs":${ms},"pool":10,"waiting":14`)
+const { line, request } = appLog('2026-11-24')
+const poolWait = (time: string, ms: number) => line(time, 'warn', 'waiting for a database connection', { waitMs: ms, pool: 10, waiting: 14 })
 
 /** A pod's first log lines. `at` is the minute it started, such as "11:20". */
 const startup = (at: string, version: string, migrations: boolean) =>
   [
-    apiLine(`${at}:12.408`, 'info', `pantry-api ${version} starting`, ',"node":"v22.11.0"'),
-    apiLine(`${at}:12.502`, 'info', 'connected to postgres', ',"pool":10'),
+    line(`${at}:12.408`, 'info', `pantry-api ${version} starting`, { node: 'v22.11.0' }),
+    line(`${at}:12.502`, 'info', 'connected to postgres', { pool: 10 }),
     ...(migrations
       ? [
-          apiLine(`${at}:12.611`, 'info', 'running migration', ',"name":"0042_drop_unused_indexes"'),
-          apiLine(`${at}:14.302`, 'info', 'migration statement', ',"sql":"DROP INDEX IF EXISTS orders_customer_id_idx"'),
-          apiLine(`${at}:14.355`, 'info', 'migration statement', ',"sql":"DROP INDEX IF EXISTS products_legacy_sku_idx"'),
-          apiLine(`${at}:14.391`, 'info', 'migration statement', ',"sql":"DROP INDEX IF EXISTS customers_referrer_idx"'),
-          apiLine(`${at}:14.402`, 'info', 'migrations complete', ',"applied":1'),
+          line(`${at}:12.611`, 'info', 'running migration', { name: '0042_drop_unused_indexes' }),
+          line(`${at}:14.302`, 'info', 'migration statement', { sql: 'DROP INDEX IF EXISTS orders_customer_id_idx' }),
+          line(`${at}:14.355`, 'info', 'migration statement', { sql: 'DROP INDEX IF EXISTS products_legacy_sku_idx' }),
+          line(`${at}:14.391`, 'info', 'migration statement', { sql: 'DROP INDEX IF EXISTS customers_referrer_idx' }),
+          line(`${at}:14.402`, 'info', 'migrations complete', { applied: 1 }),
         ]
-      : [apiLine(`${at}:12.611`, 'info', 'migrations up to date', '')]),
-    apiLine(`${at}:14.517`, 'info', 'listening', ',"port":8080'),
+      : [line(`${at}:12.611`, 'info', 'migrations up to date')]),
+    line(`${at}:14.517`, 'info', 'listening', { port: 8080 }),
   ]
 
 /** Requests in one busy minute, such as "11:39": every one that touches the database waits. */
@@ -265,10 +255,7 @@ function signals(phases: Phase[]): Dashboard['signals'] {
   return { requests, errors, latency, saturation: saturation.map((s) => Math.min(s, 100)) }
 }
 
-function timeline(length: number, phaseAt: (i: number) => Phase) {
-  const phases = Array.from({ length }, (_, i) => phaseAt(i))
-  return { minutes: phases.map((_, i) => label(i)), signals: signals(phases) }
-}
+const timeline = (length: number, phaseAt: (i: number) => Phase) => samples(length, label, phaseAt, signals)
 
 const slowAt = (i: number): Phase => (i < RELEASE_AT ? 'before' : 'slow')
 
@@ -380,25 +367,6 @@ const createIndex = (sql: string, effect: { warning: string; consequence: string
     output: { [from]: 'CREATE INDEX' },
     mutating: { ...effect, to, destroys: ['active-queries' as const] },
   }))
-
-/** Inside postgres-0. While the index is missing, backends running the order-history scan use whole CPUs. */
-const postgresProcesses = (scanning: boolean) =>
-  [
-    'USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND',
-    'postgres       1  0.0  0.7 221104 29880 ?        Ss   Oct03   1:02 postgres -c log_min_duration_statement=500ms -c log_statement=ddl',
-    'postgres      27  0.0  0.4 221240 17412 ?        Ss   Oct03   0:41 postgres: checkpointer',
-    'postgres      28  0.0  0.2 221104  8240 ?        Ss   Oct03   0:09 postgres: background writer',
-    'postgres      30  0.0  0.3 221104 10112 ?        Ss   Oct03   0:22 postgres: walwriter',
-    'postgres      31  0.0  0.2 222672  8892 ?        Ss   Oct03   0:13 postgres: autovacuum launcher',
-    ...(scanning
-      ? [
-          'postgres   48211 96.1  1.9 223412 79024 ?        Rs   11:21  17:31 postgres: pantry pantry 10.42.0.70(40118) SELECT',
-          'postgres   48214 95.7  1.9 223412 78812 ?        Rs   11:21  17:22 postgres: pantry pantry 10.42.1.82(51644) SELECT',
-        ]
-      : ['postgres   48214  0.4  1.9 223412 78812 ?        Ss   11:21  17:24 postgres: pantry pantry 10.42.1.82(51644) idle']),
-    'root       52201  0.0  0.0   2576   924 pts/0    Ss   11:39   0:00 sh',
-    'root       52207  0.0  0.0   7064  1580 pts/0    R+   11:39   0:00 ps aux',
-  ].join('\n')
 
 const indexBuilt = (how: string) =>
   `PostgreSQL ${how} Each order-history lookup now reads a few index entries instead of 4.2 million rows: it takes milliseconds again, the database's CPU falls back and the queued requests drain.`
@@ -594,7 +562,6 @@ redis-7c9d5b8f6         1         1         1       222d`,
         'built the index in 31 seconds, and blocked every write to orders while it did: checkouts waited, and some timed out. It worked, at a cost; CONCURRENTLY would have avoided the lock.',
       ),
     }),
-    { match: ['ps aux'], where: 'container', output: byIndex(postgresProcesses(true), postgresProcesses(false)) },
   ],
   dashboard,
   expertPath: [

@@ -25,6 +25,7 @@ const incident = defineIncident({
     },
     { match: ['ps aux'], output: 'USER PID' },
     { match: ['psql -U shop -c "SELECT 1"'], output: ' ?column?' },
+    { match: [`psql -U shop -c "SELECT * FROM t WHERE s = 'Idle'"`], output: 'matched the literal' },
     { match: [`psql -c "SELECT 'a', 2"`], where: 'container', output: 'ran in the container' },
   ],
   evidence: {},
@@ -88,6 +89,18 @@ describe('forgiving command matching', () => {
     ['long flags', `psql --username=shop --command 'SELECT 1'`],
   ])('accepts psql with %s', (_why, text) => {
     expect(run(text).text).toContain('?column?')
+  })
+
+  test.each([
+    ['lower-case keywords, extra spaces and a closing semicolon', `psql -U shop -c "select   1;"`],
+    ['the database named, when it is the role’s own', `psql -U shop -d shop -c "SELECT 1"`],
+  ])('accepts SQL with %s', (_why, text) => {
+    expect(run(text).text).toContain('?column?')
+  })
+
+  test('keeps the case of SQL string literals, which PostgreSQL compares exactly', () => {
+    expect(run(`psql -U shop -c "select * from t where s = 'Idle'"`).text).toContain('matched the literal')
+    expect(run(`psql -U shop -c "select * from t where s = 'idle'"`).text).not.toContain('matched the literal')
   })
 
   test('keeps a quoted argument whole when kubectl exec runs it in a container', () => {

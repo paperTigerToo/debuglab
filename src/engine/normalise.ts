@@ -189,6 +189,7 @@ export function analyse(text: string, defaultNamespace: string): Analysis {
       flags.delete('tail')
     }
   }
+  if (program === 'psql') normalisePsql(flags)
   const flagWords = [...flags.entries()]
     .map(([name, value]) => {
       const bare = name.replace(/^-+/, '')
@@ -198,6 +199,26 @@ export function analyse(text: string, defaultNamespace: string): Analysis {
   const innerWords = inner.length > 0 ? ['--', ...inner] : []
   const key = program ? [program, ...words, ...flagWords, ...innerWords].join(' ') : ''
   return { key, program, words, inner, flags, tail }
+}
+
+/**
+ * psql: the database defaults to the role's own, and a statement means the same whatever the case of its keywords,
+ * its spacing or a closing semicolon. String literals keep their case, because PostgreSQL compares them exactly.
+ */
+function normalisePsql(flags: Map<string, string | true>): void {
+  if (flags.get('dbname') !== undefined && flags.get('dbname') === flags.get('username')) flags.delete('dbname')
+  const sql = flags.get('command')
+  if (typeof sql === 'string') flags.set('command', normaliseSql(sql))
+}
+
+export function normaliseSql(sql: string): string {
+  let out = ''
+  eachChar(sql, (ch, quoted) => {
+    if (quoted) out += ch
+    else if (!/\s/.test(ch)) out += ch.toLowerCase()
+    else if (!out.endsWith(' ')) out += ' '
+  })
+  return out.trim().replace(/\s*;+$/, '')
 }
 
 export function canonical(text: string, defaultNamespace: string): string {

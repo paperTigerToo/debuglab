@@ -1,6 +1,6 @@
 import type { AccessLogLine, Dashboard, Deploy } from '../engine/types'
 import { defineIncident } from '../engine/types'
-import { access, clock, pad, round, unavailable503, wobble } from './build'
+import { access, clock, pad, podsTable, round, runningPod, samples, unavailable503, wobble } from './build'
 
 // Bad Deploy: release v2.14.0 of pantry-api renamed a config key from PAYMENT_SERVICE_URL to
 // PAYMENTS_URL, but the Deployment manifest still sets the old name. Health checks pass, so the
@@ -31,22 +31,12 @@ const datastorePods = [
   { name: 'redis-7c9d5b8f6-hq2lw', ip: '10.42.2.7', node: 'node-c' },
 ]
 
-function getPods(api: Placement[]): string {
-  const rows = [
-    ...api.map((p) => `${pad(p.pod, 30)}1/1     Running   0          ${p.age}`),
-    `${pad('postgres-0', 30)}1/1     Running   0          41d`,
-    `${pad('redis-7c9d5b8f6-hq2lw', 30)}1/1     Running   0          41d`,
-  ]
-  return [`${pad('NAME', 30)}READY   STATUS    RESTARTS   AGE`, ...rows].join('\n')
-}
-
-function getPodsWide(api: Placement[]): string {
-  const rows = [
-    ...api.map((p) => `${pad(p.pod, 30)}1/1     Running   0          ${pad(p.age, 6)}${pad(p.ip, 14)}${pad(p.node, 9)}<none>           <none>`),
-    ...datastorePods.map((d) => `${pad(d.name, 30)}1/1     Running   0          41d   ${pad(d.ip, 14)}${pad(d.node, 9)}<none>           <none>`),
-  ]
-  return [`${pad('NAME', 30)}READY   STATUS    RESTARTS   AGE   IP            NODE     NOMINATED NODE   READINESS GATES`, ...rows].join('\n')
-}
+const podRows = (api: Placement[]) => [
+  ...api.map((p) => runningPod(p, p.age)),
+  ...datastorePods.map((d) => runningPod({ pod: d.name, ip: d.ip, node: d.node }, '41d')),
+]
+const getPods = (api: Placement[]) => podsTable(podRows(api))
+const getPodsWide = (api: Placement[]) => podsTable(podRows(api), true)
 
 // ---------------------------------------------------------------------------------------------
 // Application logs (what kubectl logs shows; they live only as long as the pod)
@@ -289,10 +279,7 @@ function signals(phases: Phase[]): Dashboard['signals'] {
   return { requests, errors, latency, saturation }
 }
 
-function timeline(length: number, phaseAt: (i: number) => Phase) {
-  const phases = Array.from({ length }, (_, i) => phaseAt(i))
-  return { minutes: phases.map((_, i) => label(i)), signals: signals(phases) }
-}
+const timeline = (length: number, phaseAt: (i: number) => Phase) => samples(length, label, phaseAt, signals)
 
 const history: Deploy[] = [
   { revision: 42, version: 'v2.14.0', at: 'Today 14:02 UTC', by: 'ci: pipeline #1874' },

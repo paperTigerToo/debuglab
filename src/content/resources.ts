@@ -1,7 +1,15 @@
-// Primary sources only. Every link was opened and answered 200 when it was added (2026-11-15);
+// Primary sources only. Every link was opened and answered 200 when it was added (2026-11-15 to 2026-11-26);
 // .scratch/debuglab-v1/issues/18-*.md checks them all again before release.
 
-export const subjects = ['Incident response', 'Troubleshooting method', 'Kubernetes', 'Memory and performance', 'Databases', 'Postmortems'] as const
+export const subjects = [
+  'Incident response',
+  'Troubleshooting method',
+  'Kubernetes',
+  'Memory and performance',
+  'Databases',
+  'Resilience',
+  'Postmortems',
+] as const
 export type Subject = (typeof subjects)[number]
 
 export type Resource = {
@@ -174,6 +182,46 @@ export const resources: readonly Resource[] = [
     url: 'https://www.postgresql.org/docs/current/sql-createindex.html',
     subject: 'Databases',
     why: 'Its section on building indexes concurrently explains the lock a plain build takes, and what to do when a concurrent build leaves an invalid index.',
+  },
+  {
+    id: 'kubectl-set-env',
+    title: 'kubectl set env',
+    publisher: 'Kubernetes documentation',
+    url: 'https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_env/',
+    subject: 'Kubernetes',
+    why: 'Every way to change a Deployment’s environment from the command line, and a reminder that each change rolls out new pods.',
+  },
+  {
+    id: 'node-postgres-pool',
+    title: 'Pool',
+    publisher: 'node-postgres',
+    url: 'https://node-postgres.com/apis/pool',
+    subject: 'Databases',
+    why: 'How a Node.js connection pool hands out connections, what its size and timeouts mean, and why a client must always be released.',
+  },
+  {
+    id: 'pg-client-config',
+    title: 'Client Connection Defaults',
+    publisher: 'PostgreSQL documentation',
+    url: 'https://www.postgresql.org/docs/current/runtime-config-client.html',
+    subject: 'Databases',
+    why: 'Documents idle_in_transaction_session_timeout and statement_timeout, the database’s own guards against clients that hold connections too long.',
+  },
+  {
+    id: 'sre-cascading-failures',
+    title: 'Addressing Cascading Failures',
+    publisher: 'Google, Site Reliability Engineering',
+    url: 'https://sre.google/sre-book/addressing-cascading-failures/',
+    subject: 'Resilience',
+    why: 'How one slow component exhausts resources in everything that calls it, and the timeouts, deadlines and load shedding that stop the spread.',
+  },
+  {
+    id: 'fowler-circuit-breaker',
+    title: 'CircuitBreaker',
+    publisher: 'Martin Fowler',
+    url: 'https://martinfowler.com/bliki/CircuitBreaker.html',
+    subject: 'Resilience',
+    why: 'A short, clear account of the circuit breaker: stop calling a failing dependency for a while instead of waiting on it every time.',
   },
   {
     id: 'sre-postmortem-culture',

@@ -64,6 +64,6 @@ test('Resources are grouped by subject, each with a reason to read it', async ({
     await expect(page.getByRole('heading', { level: 2, name: subject })).toBeVisible()
   }
   const kubernetes = page.getByRole('region', { name: 'Kubernetes' })
-  await expect(kubernetes.getByRole('listitem')).toHaveCount(7)
+  await expect(kubernetes.getByRole('listitem')).toHaveCount(8)
   await expect(kubernetes).toContainText('why they disappear with the pod')
 })
