@@ -1,13 +1,11 @@
 import { expect, test } from '@playwright/test'
 
-test('the Playbook groups its Entries by layer, showing only layers that have some', async ({ page }) => {
+test('the Playbook groups its Entries by layer, from the cluster down to the application', async ({ page }) => {
   await page.goto('playbook')
-  for (const layer of ['Cluster', 'Container', 'Network', 'Database', 'Application']) {
-    await expect(page.getByRole('heading', { level: 2, name: layer })).toBeVisible()
-  }
-  await expect(page.getByRole('heading', { level: 2, name: 'Host' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['Cluster', 'Container', 'Host', 'Network', 'Database', 'Application'])
+  await expect(page.getByRole('region', { name: 'Host' }).getByRole('link')).toHaveCount(3)
   await expect(page.getByRole('region', { name: 'Cluster' }).getByRole('link')).toHaveCount(4)
-  await expect(page.getByRole('region', { name: 'Database' }).getByRole('link')).toHaveCount(4)
+  await expect(page.getByRole('region', { name: 'Database' }).getByRole('link')).toHaveCount(5)
 })
 
 test('searching by command finds the Entry, and opening it shows its parts', async ({ page, context }) => {

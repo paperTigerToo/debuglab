@@ -152,5 +152,8 @@ export const kubeResourceTypes: Record<string, string> = Object.fromEntries(
     ['secret', 'secrets'],
     ['ingress', 'ing', 'ingresses'],
     ['statefulset', 'sts', 'statefulsets'],
+    ['persistentvolumeclaim', 'pvc', 'persistentvolumeclaims'],
+    ['persistentvolume', 'pv', 'persistentvolumes'],
+    ['storageclass', 'sc', 'storageclasses'],
   ].flatMap(([canonical, ...aliases]) => [canonical!, ...aliases].map((a) => [a, canonical!])),
 )

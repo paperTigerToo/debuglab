@@ -17,18 +17,21 @@ import { access, appLog, clock, pad, podsTable, round, runningPod, samples, topT
 // ---------------------------------------------------------------------------------------------
 // Pods
 
-const slowPods = [
-  { pod: 'pantry-api-9d7c5f8b42-fx4kd', node: 'node-a', ip: '10.42.0.70' },
-  { pod: 'pantry-api-9d7c5f8b42-lq8wm', node: 'node-b', ip: '10.42.1.82' },
-  { pod: 'pantry-api-9d7c5f8b42-v6tzn', node: 'node-c', ip: '10.42.2.65' },
+/** A pantry-api pod. Its CPU depends on whether it is waiting on the slow database or serving at full speed. */
+type Pod = { pod: string; node: string; ip: string; memory: string; cpu: { waiting: string; serving: string } }
+
+const slowPods: Pod[] = [
+  { pod: 'pantry-api-9d7c5f8b42-fx4kd', node: 'node-a', ip: '10.42.0.70', memory: '152Mi', cpu: { waiting: '38m', serving: '94m' } },
+  { pod: 'pantry-api-9d7c5f8b42-lq8wm', node: 'node-b', ip: '10.42.1.82', memory: '149Mi', cpu: { waiting: '41m', serving: '101m' } },
+  { pod: 'pantry-api-9d7c5f8b42-v6tzn', node: 'node-c', ip: '10.42.2.65', memory: '155Mi', cpu: { waiting: '36m', serving: '97m' } },
 ]
-const rolledBackPods = [
-  { pod: 'pantry-api-6f8b7d9c55-hp2xr', node: 'node-a', ip: '10.42.0.74' },
-  { pod: 'pantry-api-6f8b7d9c55-m9kcw', node: 'node-b', ip: '10.42.1.85' },
-  { pod: 'pantry-api-6f8b7d9c55-s4bfz', node: 'node-c', ip: '10.42.2.69' },
+const rolledBackPods: Pod[] = [
+  { pod: 'pantry-api-6f8b7d9c55-hp2xr', node: 'node-a', ip: '10.42.0.74', memory: '152Mi', cpu: { waiting: '35m', serving: '91m' } },
+  { pod: 'pantry-api-6f8b7d9c55-m9kcw', node: 'node-b', ip: '10.42.1.85', memory: '149Mi', cpu: { waiting: '39m', serving: '98m' } },
+  { pod: 'pantry-api-6f8b7d9c55-s4bfz', node: 'node-c', ip: '10.42.2.69', memory: '155Mi', cpu: { waiting: '37m', serving: '95m' } },
 ]
 
-const getPods = (api: { pod: string; ip: string; node: string }[], age: string) =>
+const getPods = (api: Pod[], age: string) =>
   podsTable([
     ...api.map((p) => runningPod(p, age)),
     runningPod({ pod: 'postgres-0', ip: '10.42.0.12', node: 'node-a' }, '51d'),
@@ -36,10 +39,10 @@ const getPods = (api: { pod: string; ip: string; node: string }[], age: string) 
   ])
 
 /** `kubectl top pods`: the API pods' CPU in pod order, and PostgreSQL's CPU and memory. */
-const topPods = (api: { pod: string }[], o: { apiCpu: string[]; dbCpu: string; dbMemory: string }) =>
+const topPods = (api: Pod[], apiState: keyof Pod['cpu'], database: { cpu: string; memory: string }) =>
   topTable([
-    ...api.map((p, i) => ({ name: p.pod, cpu: o.apiCpu[i]!, memory: ['152Mi', '149Mi', '155Mi'][i]! })),
-    { name: 'postgres-0', cpu: o.dbCpu, memory: o.dbMemory },
+    ...api.map((p) => ({ name: p.pod, cpu: p.cpu[apiState], memory: p.memory })),
+    { name: 'postgres-0', ...database },
     { name: 'redis-7c9d5b8f6-hq2lw', cpu: '12m', memory: '41Mi' },
   ])
 
@@ -431,10 +434,10 @@ export const slowQuery = defineIncident({
     {
       match: ['kubectl top pods'],
       output: {
-        slow: topPods(slowPods, { apiCpu: ['38m', '41m', '36m'], dbCpu: '1987m', dbMemory: '1210Mi' }),
-        'rolled-back': topPods(rolledBackPods, { apiCpu: ['35m', '39m', '37m'], dbCpu: '1979m', dbMemory: '1214Mi' }),
-        indexed: topPods(slowPods, { apiCpu: ['94m', '101m', '97m'], dbCpu: '402m', dbMemory: '1236Mi' }),
-        'rolled-back-indexed': topPods(rolledBackPods, { apiCpu: ['91m', '98m', '95m'], dbCpu: '398m', dbMemory: '1239Mi' }),
+        slow: topPods(slowPods, 'waiting', { cpu: '1987m', memory: '1210Mi' }),
+        'rolled-back': topPods(rolledBackPods, 'waiting', { cpu: '1979m', memory: '1214Mi' }),
+        indexed: topPods(slowPods, 'serving', { cpu: '402m', memory: '1236Mi' }),
+        'rolled-back-indexed': topPods(rolledBackPods, 'serving', { cpu: '398m', memory: '1239Mi' }),
       },
       reveals: [{ finding: 'database-saturated', seenIn: '1987m' }],
     },

@@ -3,6 +3,7 @@ import { expect, test } from 'vitest'
 import { currentHint, dashboard, start, step } from '../engine/engine'
 import type { IncidentDefinition, SessionState } from '../engine/types'
 import { connectionPool } from './connection-pool'
+import { fullDisk, PATCH_40GI } from './full-disk'
 import { memoryLeak } from './memory-leak'
 import { slowQuery } from './slow-query'
 
@@ -57,4 +58,18 @@ test('Connection Pool Exhaustion: a restart frees the pool only until slow check
   const mitigated = step(connectionPool, restarted.state, { kind: 'command', text: 'kubectl set env deploy/pantry-api PAYMENTS_TIMEOUT_MS=2000' })
   const confirmed = step(connectionPool, mitigated.state, { kind: 'command', text: 'y' }).state
   expect(dashboard(connectionPool, confirmed).alert.status).toBe('resolved')
+})
+
+test('Full Disk: growing the volume stops the harm, and the disk is still filling', () => {
+  const { state } = play(fullDisk, PATCH_40GI, 'y')
+  expect(dashboard(fullDisk, state).alert.status).toBe('resolved')
+  expect(dashboard(fullDisk, state).alert.summary).toContain('filling')
+  expect(play(fullDisk, PATCH_40GI, 'y', 'kubectl get pvc').text).toContain('40Gi')
+})
+
+test('Full Disk: deleting pg_wal crashes PostgreSQL, which then cannot start', () => {
+  const { state, text } = play(fullDisk, 'kubectl exec -it postgres-0 -- sh', 'rm -rf /var/lib/postgresql/data/pg_wal/*', 'y')
+  expect(text).toContain('pg_xlog')
+  expect(dashboard(fullDisk, state).alert.status).toBe('firing')
+  expect(play(fullDisk, 'kubectl exec -it postgres-0 -- sh', 'rm -rf /var/lib/postgresql/data/pg_wal/*', 'y', 'exit', 'kubectl get pods').text).toContain('CrashLoopBackOff')
 })

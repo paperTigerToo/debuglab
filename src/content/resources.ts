@@ -1,4 +1,4 @@
-// Primary sources only. Every link was opened and answered 200 when it was added (2026-11-15 to 2026-11-26);
+// Primary sources only. Every link was opened and answered 200 when it was added (2026-11-15 to 2026-11-27);
 // .scratch/debuglab-v1/issues/18-*.md checks them all again before release.
 
 export const subjects = [
@@ -222,6 +222,38 @@ export const resources: readonly Resource[] = [
     url: 'https://martinfowler.com/bliki/CircuitBreaker.html',
     subject: 'Resilience',
     why: 'A short, clear account of the circuit breaker: stop calling a failing dependency for a while instead of waiting on it every time.',
+  },
+  {
+    id: 'k8s-persistent-volumes',
+    title: 'Persistent Volumes',
+    publisher: 'Kubernetes documentation',
+    url: 'https://kubernetes.io/docs/concepts/storage/persistent-volumes/',
+    subject: 'Kubernetes',
+    why: 'How a PersistentVolumeClaim ties a pod to its disk, and what expanding a claim does and does not allow, such as shrinking it again.',
+  },
+  {
+    id: 'gregg-use-method',
+    title: 'The USE Method',
+    publisher: 'Brendan Gregg',
+    url: 'https://www.brendangregg.com/usemethod.html',
+    subject: 'Memory and performance',
+    why: 'For every resource, check utilisation, saturation and errors. A disk’s capacity is a resource too, and this checklist makes you look at it.',
+  },
+  {
+    id: 'pg-wal-intro',
+    title: 'Write-Ahead Logging (WAL)',
+    publisher: 'PostgreSQL documentation',
+    url: 'https://www.postgresql.org/docs/current/wal-intro.html',
+    subject: 'Databases',
+    why: 'Explains what pg_wal holds and why PostgreSQL cannot recover without it, which is why it must never be deleted to free space.',
+  },
+  {
+    id: 'pg-alter-system',
+    title: 'ALTER SYSTEM',
+    publisher: 'PostgreSQL documentation',
+    url: 'https://www.postgresql.org/docs/current/sql-altersystem.html',
+    subject: 'Databases',
+    why: 'Where ALTER SYSTEM writes its settings, how to reset them, and when a reload or a restart is needed for them to take effect.',
   },
   {
     id: 'sre-postmortem-culture',

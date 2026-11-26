@@ -456,5 +456,33 @@ export const terms: readonly Term[] = [
     matches: ['max_connections'],
     explanation: 'The most connections PostgreSQL accepts at once. Past it, every new connection is refused, from any client.',
   },
+  { id: 'du', matches: ['du'], explanation: 'Measures how much space files and directories take. du -sh DIR/* gives one total per entry, in K, M and G.' },
+  {
+    id: 'no-space',
+    playbook: 'is-a-disk-full',
+    matches: ['No space left on device'],
+    explanation: 'The operating system refused a write because the filesystem is full, or has run out of inodes.',
+  },
+  {
+    id: 'pvc',
+    matches: ['PersistentVolumeClaim', 'pvc', 'PVC'],
+    explanation: 'A pod’s request for a disk that outlives the pod. It has a size, and some storage classes let it grow but never shrink.',
+  },
+  {
+    id: 'pg-wal',
+    matches: ['pg_wal', 'write-ahead log'],
+    explanation: 'PostgreSQL’s record of changes not yet safely in the tables. Not a log of messages: deleting it crashes the database and loses data.',
+  },
+  {
+    id: 'logging-collector',
+    matches: ['logging_collector', 'logging collector'],
+    explanation: 'Makes PostgreSQL write its logs to files, by default in the data directory, instead of to the container output.',
+  },
+  {
+    id: 'alter-system',
+    playbook: 'what-settings-is-postgresql-running-with',
+    matches: ['ALTER SYSTEM', 'postgresql.auto.conf'],
+    explanation: 'Changes a PostgreSQL setting from SQL, saved in postgresql.auto.conf in the data directory, where no manifest shows it.',
+  },
   { id: 'canary', matches: ['canary'], explanation: 'Sending a small share of traffic to a new version first, so a bad release harms few people.' },
 ]

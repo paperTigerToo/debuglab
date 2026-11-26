@@ -218,6 +218,14 @@ function kubectlExec(definition: IncidentDefinition, state: SessionState, analys
   if (analysis.inner.length === 0) return error('error: you must specify at least one command for the container')
   const shell = SHELLS[analysis.inner.join(' ')]
   if (shell) return { kind: 'enter-shell', location: { kind: 'container', pod, shell } }
+  // `sh -c 'SCRIPT'` hands the script to the container's own shell.
+  const [program = '', flag, script] = analysis.inner
+  if (SHELLS[program] && flag === '-c' && script !== undefined && analysis.inner.length === 3) {
+    return resolveSource(definition, state, script, { kind: 'container', pod, shell: SHELLS[program] })
+  }
+  // Without a shell nothing expands a glob, so the program receives the pattern itself as a file name.
+  const glob = analysis.inner.slice(1).find((word) => !/\s/.test(word) && /[*?[]/.test(word))
+  if (glob) return error(`${program}: ${program === 'rm' ? 'cannot remove' : 'cannot access'} '${glob}': No such file or directory`)
   return resolveSource(definition, state, analysis.inner.map(requote).join(' '), { kind: 'container', pod, shell: 'sh' })
 }
 
@@ -347,6 +355,7 @@ const notFoundKind: Record<string, string> = {
   node: 'nodes',
   configmap: 'configmaps',
   secret: 'secrets',
+  storageclass: 'storageclasses.storage.k8s.io',
 }
 
 /**

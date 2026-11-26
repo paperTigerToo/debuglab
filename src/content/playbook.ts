@@ -955,6 +955,208 @@ export const playbook: readonly PlaybookEntry[] = [
     ],
     links: { concepts: ['mitigate-then-investigate'], resources: ['kubectl-set-env'] },
   },
+  {
+    id: 'is-a-disk-full',
+    question: 'Is a disk full, and which one?',
+    layer: 'Host',
+    summary:
+      'A full disk shows up as writes failing with "No space left on device" while reads still work. A container sees several filesystems; only one of them is full.',
+    commands: [
+      { text: 'kubectl exec postgres-0 -- df -h', effect: 'read-only', what: 'Every filesystem the container sees, how big it is and how full, in K, M and G.' },
+      { text: 'kubectl get pvc', effect: 'read-only', what: 'The persistent volumes claimed in the namespace, and the size of each.' },
+      {
+        text: 'kubectl describe pvc data-postgres-0',
+        effect: 'read-only',
+        what: 'One volume’s capacity, storage class and the pod using it, with any resize events.',
+      },
+    ],
+    healthy: {
+      label: 'Room to spare',
+      output: table(
+        'Filesystem      Size  Used Avail Use% Mounted on',
+        'overlay          95G   38G   57G  40% /',
+        '/dev/sdb         20G  6.2G   14G  31% /var/lib/postgresql/data',
+      ),
+      notes: [{ mark: '31%', note: 'The database’s volume is under a third full.' }],
+    },
+    unhealthy: {
+      label: 'Full',
+      output: table(
+        'Filesystem      Size  Used Avail Use% Mounted on',
+        'overlay          95G   38G   57G  40% /',
+        '/dev/sdb         20G   20G     0 100% /var/lib/postgresql/data',
+      ),
+      notes: [
+        { mark: '100%', note: 'Not a byte left on the volume PostgreSQL keeps its data on, so every write fails.' },
+        { mark: '40%', note: 'The container’s own filesystem has plenty of room: it is not the machine that is full, but one volume.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'One filesystem is full',
+        then: 'Find out what on it takes the space before you delete anything: [What is filling the disk?](playbook:what-is-filling-the-disk)',
+      },
+      {
+        if: 'Nothing is full',
+        then: '"No space left on device" can also mean no free inodes. Check with df -i.',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['gregg-use-method', 'k8s-persistent-volumes'] },
+  },
+  {
+    id: 'what-is-filling-the-disk',
+    question: 'What is filling the disk?',
+    layer: 'Host',
+    summary:
+      'Measure, directory by directory, from the top of the full filesystem down. The answer is usually one directory, and often something nobody expected to grow.',
+    commands: [
+      {
+        text: "kubectl exec postgres-0 -- sh -c 'du -sh /var/lib/postgresql/data/*'",
+        effect: 'read-only',
+        what: 'The total size of each file and directory at the top of the volume. The * needs the container’s shell to expand it, hence sh -c.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- ls -lh /var/lib/postgresql/data/log',
+        effect: 'read-only',
+        what: 'The files in the largest directory, with their sizes and when each was last written.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- ls -lh /var/lib/postgresql/data/log | tee postgres-log-files.txt',
+        effect: 'read-only',
+        what: 'The same, with a copy kept on your machine. If freeing space means deleting these files, this listing is all that remains of them.',
+      },
+    ],
+    healthy: {
+      label: 'Mostly data',
+      output: table('3.1G\t/var/lib/postgresql/data/base', '1.4G\t/var/lib/postgresql/data/log', '1.0G\t/var/lib/postgresql/data/pg_wal'),
+      notes: [{ mark: '3.1G', note: 'base holds the tables and indexes: on a healthy database it is the biggest directory.' }],
+    },
+    unhealthy: {
+      label: 'Something unexpected',
+      output: table('3.1G\t/var/lib/postgresql/data/base', '15G\t/var/lib/postgresql/data/log', '1.0G\t/var/lib/postgresql/data/pg_wal'),
+      notes: [
+        { mark: '15G', note: 'PostgreSQL’s own message logs take five times as much room as the data.' },
+        { mark: 'pg_wal', note: 'The write-ahead log, a normal 1.0G. Despite the name it is not a log of messages: never delete it.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'Old logs or other disposable files take the space',
+        then: 'Keep their listing, then free the space: [How do I free disk space safely?](playbook:how-do-i-free-disk-space-safely)',
+      },
+      {
+        if: 'Logs grow far faster than they used to',
+        then: 'Something is making the service log more. Check its settings: [What settings is PostgreSQL running with?](playbook:what-settings-is-postgresql-running-with)',
+      },
+      {
+        if: 'The data itself has grown',
+        then: 'The volume is simply too small for the data now. Grow it, then find out what grew and whether it should have.',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['gregg-use-method'] },
+  },
+  {
+    id: 'what-settings-is-postgresql-running-with',
+    question: 'What settings is PostgreSQL running with?',
+    layer: 'Database',
+    summary:
+      'Settings changed with ALTER SYSTEM live in postgresql.auto.conf inside the data directory, not in any manifest. They are easy to forget and outlive the reason they were made.',
+    commands: [
+      {
+        text: 'kubectl exec postgres-0 -- cat /var/lib/postgresql/data/postgresql.auto.conf',
+        effect: 'read-only',
+        what: 'Every setting changed with ALTER SYSTEM, in one short file.',
+      },
+      {
+        text: 'kubectl exec postgres-0 -- psql -U pantry -c "SHOW log_min_duration_statement"',
+        effect: 'read-only',
+        what: 'The value of one setting as the running server sees it.',
+      },
+      {
+        text: "kubectl exec postgres-0 -- psql -U pantry -c \"SELECT name, setting, sourcefile FROM pg_settings WHERE source <> 'default'\"",
+        effect: 'read-only',
+        what: 'Every setting that differs from the default, and which file set it.',
+      },
+    ],
+    healthy: {
+      label: 'Nothing surprising',
+      output: table('# Do not edit this file manually!', '# It will be overwritten by the ALTER SYSTEM command.', "log_min_duration_statement = '500ms'"),
+      notes: [{ mark: "'500ms'", note: 'Only statements slower than half a second are logged: a few lines a minute.' }],
+    },
+    unhealthy: {
+      label: 'A debug setting left on',
+      output: table(
+        '# Do not edit this file manually!',
+        '# It will be overwritten by the ALTER SYSTEM command.',
+        "logging_collector = 'on'",
+        "log_min_duration_statement = '0'",
+      ),
+      notes: [
+        { mark: "log_min_duration_statement = '0'", note: 'Every statement is logged, however fast: thousands of lines a second on a busy database.' },
+        { mark: "logging_collector = 'on'", note: 'Logs go to files in the data directory, on the same volume as the data, instead of to the container output.' },
+      ],
+    },
+    followOn: [
+      {
+        if: 'A setting was changed for debugging and never put back',
+        then: 'Once the harm has stopped, reset it with ALTER SYSTEM RESET, reload with SELECT pg_reload_conf(), and record who changed it and why.',
+      },
+      {
+        if: 'The settings look normal',
+        then: 'The growth comes from somewhere else. Go back to [What is filling the disk?](playbook:what-is-filling-the-disk)',
+      },
+    ],
+    links: { concepts: ['investigating-by-hypothesis'], resources: ['pg-alter-system', 'pg-logging'] },
+  },
+  {
+    id: 'how-do-i-free-disk-space-safely',
+    question: 'How do I free disk space safely?',
+    layer: 'Host',
+    summary:
+      'Delete only what the system can do without, and only after you know what it is. On a database volume, some files that look disposable are what keeps the data intact.',
+    commands: [
+      {
+        text: "kubectl exec postgres-0 -- sh -c 'rm /var/lib/postgresql/data/log/*.log'",
+        effect: 'mutating',
+        what: 'Deletes PostgreSQL’s message logs, which the database never reads back. A file still open keeps its space until the server starts a new one.',
+      },
+      {
+        text: `kubectl patch pvc data-postgres-0 -p '{"spec":{"resources":{"requests":{"storage":"40Gi"}}}}'`,
+        effect: 'mutating',
+        what: 'Grows the volume, if its storage class allows expansion. Buys time without deleting anything, and can never be undone.',
+      },
+      { text: 'kubectl get storageclass', effect: 'read-only', what: 'Shows whether each storage class allows volumes to grow.' },
+    ],
+    healthy: {
+      label: 'Safe to delete',
+      output: table(
+        '-rw------- 1 postgres postgres 5.9G Nov 25 23:59 postgresql-2026-11-25.log',
+        '-rw------- 1 postgres postgres 6.1G Nov 26 23:59 postgresql-2026-11-26.log',
+      ),
+      notes: [{ mark: 'postgresql-2026-11-25.log', note: 'Closed message logs from past days. Keep their listing, then delete them.' }],
+    },
+    unhealthy: {
+      label: 'Never delete',
+      output: table('000000010000000000000089', '00000001000000000000008A', '00000001000000000000008B'),
+      notes: [
+        {
+          mark: '00000001000000000000008A',
+          note: 'Segments of pg_wal, the write-ahead log. They hold changes not yet written into the tables. Deleting them crashes PostgreSQL and loses data.',
+        },
+      ],
+    },
+    followOn: [
+      {
+        if: 'Space is free and writes work again',
+        then: 'Stop whatever filled the disk from filling it again: [What settings is PostgreSQL running with?](playbook:what-settings-is-postgresql-running-with)',
+      },
+      {
+        if: 'Nothing on the volume is safe to delete',
+        then: 'Grow the volume, then plan how the data will fit from now on.',
+      },
+    ],
+    links: { concepts: ['mitigate-then-investigate'], resources: ['pg-wal-intro', 'k8s-persistent-volumes'] },
+  },
 ]
 
 export const entryById = (id: string) => playbook.find((e) => e.id === id)

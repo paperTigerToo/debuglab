@@ -18,6 +18,7 @@ const incident = defineIncident({
   },
   commands: [
     { match: ['kubectl get pods'], output: 'NAME        READY\napi-7f9c-2xk   1/1', reveals: ['replaced'] },
+    { match: ['kubectl get persistentvolumeclaims'], output: 'data-db-0   Bound' },
     {
       match: ['kubectl logs deployment/api', 'kubectl logs deployment/api --since 5m'],
       output: 'INFO started\nERROR checkout failed\nerror: retry failed',
@@ -27,6 +28,7 @@ const incident = defineIncident({
     { match: ['psql -U shop -c "SELECT 1"'], output: ' ?column?' },
     { match: [`psql -U shop -c "SELECT * FROM t WHERE s = 'Idle'"`], output: 'matched the literal' },
     { match: [`psql -c "SELECT 'a', 2"`], where: 'container', output: 'ran in the container' },
+    { match: ['du -sh /data/*'], where: 'container', output: '12K	/data/a' },
   ],
   evidence: {},
   resources: ['pod/api-7f9c-2xk', 'deployment/api'],
@@ -105,6 +107,21 @@ describe('forgiving command matching', () => {
 
   test('keeps a quoted argument whole when kubectl exec runs it in a container', () => {
     expect(run(`kubectl exec api-7f9c-2xk -- psql -c "SELECT 'a', 2"`).text).toContain('ran in the container')
+  })
+
+  test('kubectl exec runs a command with no shell, so a glob reaches the program as it is and fails', () => {
+    const { text, state } = run('kubectl exec api-7f9c-2xk -- du -sh /data/*')
+    expect(text).toContain("du: cannot access '/data/*': No such file or directory")
+    expect(state.timeline.at(-1)?.result).toBe('unknown')
+  })
+
+  test('sh -c runs a command through the container’s shell, which expands the glob', () => {
+    expect(run(`kubectl exec api-7f9c-2xk -- sh -c 'du -sh /data/*'`).text).toContain('12K\t/data/a')
+    expect(run('kubectl exec -it api-7f9c-2xk -- sh', 'du -sh /data/*').text).toContain('12K\t/data/a')
+  })
+
+  test.each(['kubectl get pvc', 'kubectl get persistentvolumeclaim'])('knows PersistentVolumeClaims by any name: %s', (text) => {
+    expect(run(text).text).toContain('data-db-0   Bound')
   })
 
   test('does not match a different namespace', () => {
